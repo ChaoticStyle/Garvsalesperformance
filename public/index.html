@@ -1,0 +1,3319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GARV Performance Dashboard v4.4.0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/*
+  Design reference: Linear.app nav, Vercel dashboard density,
+  Hex Analytics card structure, Retool data tables.
+  Dark / monochromatic / sharp. Accent only where it earns it.
+*/
+:root{
+  --ink0:#06090f; --ink1:#0b1119; --ink2:#101820; --ink3:#162030;
+  --card:#1b2738; --card2:#1f2e40;
+  --rule:#1d2d3e; --rule2:#253648;
+  --gold:#f5a623; --gold2:#ffbc47; --g-bg:rgba(245,166,35,.07); --g-bd:rgba(245,166,35,.22);
+  --grn:#22c55e;  --g2-bg:rgba(34,197,94,.07);
+  --red:#ef4444;  --r-bg:rgba(239,68,68,.07);
+  --blu:#3b82f6;  --b-bg:rgba(59,130,246,.07);
+  --pur:#8b5cf6;  --p-bg:rgba(139,92,246,.07);
+  --ora:#f97316;
+  /* v4.3.7 — Lifted text tokens for legibility.
+     Old palette had --t2 at 2.11:1 contrast and --t3 at 1.39:1 against
+     the card background (#1b2738), both well below WCAG AA (4.5:1
+     normal text, 3:1 large text). Bar labels, KPI sublabels, "CONV%"
+     etc. were rendering as near-invisible blue-on-blue noise.
+
+     New palette keeps the four-step hierarchy intact (each tier ~1.55-
+     1.76x luminance gap, so visual rank order is preserved) but lifts
+     the bottom two tiers well above AA minimums:
+       --t0  #dde9f5  12.23:1  unchanged — primary
+       --t1  #a3b6cc   7.26:1  (was #8099b4 / 5.12:1) — secondary
+       --t2  #7a92ad   4.69:1  (was #435a72 / 2.11:1) — tertiary, AA
+       --t3  #5e7892   3.28:1  (was #2c3f52 / 1.39:1) — quaternary, AA-large
+     Used everywhere from baseball-card bar labels to KPI sublabels to
+     table headers. */
+  --t0:#dde9f5; --t1:#a3b6cc; --t2:#7a92ad; --t3:#5e7892;
+  --radius:7px; --radius2:11px;
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'DM Mono',ui-monospace,monospace;
+  --disp:'Bebas Neue',cursive;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{height:100%;overflow-y:scroll}
+body{background:var(--ink0);color:var(--t0);font-family:var(--font);font-size:13px;line-height:1.5;min-height:100vh;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--rule2);border-radius:3px}
+
+/* ══ TOPBAR ════════════════════════════════════════════════════ */
+#topbar{
+  position:sticky;top:0;z-index:300;
+  background:rgba(11,17,25,.96);
+  backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--rule);
+}
+.tb-row1{
+  height:52px;padding:0 24px;
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+}
+/* Wordmark */
+.wm{display:flex;align-items:center;gap:9px;flex-shrink:0}
+.wm-gem{
+  width:18px;height:18px;flex-shrink:0;
+  background:var(--gold);
+  clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%);
+}
+.wm-name{font-family:var(--disp);font-size:17px;letter-spacing:2.5px;line-height:1}
+.wm-name em{color:var(--gold);font-style:normal}
+.wm-sep{width:1px;height:18px;background:var(--rule2);margin:0 2px}
+.wm-sub{font-size:10px;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase}
+/* Actions */
+.tb-actions{display:flex;align-items:center;gap:7px;flex-shrink:0}
+
+/* Store tab rail */
+.store-rail{
+  display:flex;align-items:stretch;
+  border-top:1px solid var(--rule);
+  overflow-x:auto;padding:0 24px;
+  scrollbar-width:none;gap:0;
+}
+.store-rail::-webkit-scrollbar{display:none}
+.s-tab{
+  display:flex;align-items:center;gap:6px;
+  padding:8px 14px;
+  border-bottom:2px solid transparent;
+  cursor:pointer;white-space:nowrap;
+  color:var(--t2);font-size:12px;font-weight:500;
+  transition:color .12s,background .12s;
+  user-select:none;flex-shrink:0;
+}
+.s-tab:hover{color:var(--t1);background:rgba(255,255,255,.02)}
+.s-tab.active{color:var(--t0);border-bottom-color:var(--gold)}
+/* special network tab */
+.s-tab.net{
+  font-size:11px;letter-spacing:.3px;
+  border-right:1px solid var(--rule);
+  margin-right:6px;padding-right:18px;
+  color:var(--t1);
+}
+.s-tab.net.active{color:var(--gold)}
+/* brand tab — Airstream (silver / platinum accent) */
+.s-tab.brand{
+  border-left:1px solid var(--rule);
+  margin-left:6px;padding-left:18px;
+  color:#c8d0db;
+  position:relative;
+}
+.s-tab.brand::before{
+  content:'';
+  width:7px;height:7px;border-radius:50%;
+  background:linear-gradient(135deg,#e8edf3 0%,#9aa6b5 100%);
+  box-shadow:0 0 0 1px rgba(232,237,243,.15);
+  flex-shrink:0;
+}
+.s-tab.brand .s-dot{display:none}
+.s-tab.brand:hover{color:#e8edf3;background:rgba(232,237,243,.025)}
+.s-tab.brand.active{
+  color:#f4f7fa;
+  border-bottom-color:#c8d0db;
+}
+.s-tab.brand.active::before{box-shadow:0 0 6px rgba(200,208,219,.55)}
+.s-tab.brand .s-score{color:rgba(200,208,219,.55)}
+/* live dot */
+.s-dot{width:6px;height:6px;border-radius:50%;background:var(--rule2);flex-shrink:0;transition:all .15s}
+.s-tab.live .s-dot{background:var(--grn);box-shadow:0 0 5px rgba(34,197,94,.5)}
+.s-tab.active .s-dot{background:var(--gold);box-shadow:0 0 5px rgba(245,166,35,.45)}
+.s-score{font-size:10px;color:var(--t3);font-weight:400;margin-left:1px}
+
+/* ══ BUTTONS ═══════════════════════════════════════════════════ */
+.btn{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:6px 13px;border-radius:var(--radius);
+  font-family:var(--font);font-size:12px;font-weight:500;
+  cursor:pointer;border:1px solid transparent;
+  transition:all .12s;white-space:nowrap;line-height:1;
+}
+.btn-ghost{background:transparent;border-color:var(--rule2);color:var(--t1)}
+.btn-ghost:hover{border-color:var(--t2);background:var(--ink2)}
+.btn-gold{background:var(--gold);border-color:var(--gold);color:#060a10;font-weight:700}
+.btn-gold:hover{background:var(--gold2)}
+.btn-ai{background:var(--p-bg);border-color:rgba(139,92,246,.3);color:var(--pur)}
+.btn-ai:hover{background:rgba(139,92,246,.14);border-color:rgba(139,92,246,.5)}
+
+/* ══ PAGE SHELL ════════════════════════════════════════════════ */
+#page{display:flex;flex-direction:column;min-height:calc(100vh - 93px)}
+
+/* Context bar (per-store title + tags) */
+.ctx{
+  background:var(--ink1);border-bottom:1px solid var(--rule);
+  padding:10px 24px;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:10px;flex-wrap:wrap;
+}
+.ctx-l{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+.ctx-title{font-family:var(--disp);font-size:21px;letter-spacing:1px;line-height:1}
+.ctx-title em{color:var(--gold);font-style:normal}
+.ctx.brand .ctx-title em{color:#c8d0db}
+.ctx-r{display:flex;gap:7px;align-items:center}
+.tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:500;border:1px solid transparent}
+.tag-p{background:var(--b-bg);color:var(--blu);border-color:rgba(59,130,246,.18)}
+.tag-f{background:var(--r-bg);color:#fc8181;border-color:rgba(239,68,68,.18)}
+.tag-c{background:var(--g2-bg);color:var(--grn);border-color:rgba(34,197,94,.18)}
+.tag-n{background:var(--ink3);color:var(--t2);border-color:var(--rule)}
+.tag-brand{background:rgba(200,208,219,.08);color:#dfe5ec;border-color:rgba(200,208,219,.22)}
+
+/* Section tabs (Lineup / Scorecard / etc.) */
+.sec-rail{
+  background:var(--ink1);border-bottom:1px solid var(--rule);
+  display:flex;padding:0 24px;overflow-x:auto;scrollbar-width:none;
+}
+.sec-rail::-webkit-scrollbar{display:none}
+.sec-tab{
+  padding:8px 13px;font-size:11px;font-weight:500;
+  letter-spacing:.5px;text-transform:uppercase;
+  color:var(--t2);cursor:pointer;border-bottom:2px solid transparent;
+  white-space:nowrap;transition:color .12s;user-select:none;
+}
+.sec-tab:hover{color:var(--t1)}
+.sec-tab.active{color:var(--gold);border-bottom-color:var(--gold)}
+
+/* Content area */
+.vwrap{padding:20px 24px 52px;flex:1}
+.slbl{font-family:var(--disp);font-size:10px;letter-spacing:4px;color:var(--t3);margin-bottom:11px}
+
+/* ══ NETWORK OVERVIEW ══════════════════════════════════════════ */
+.kpi5{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:20px}
+.kpi{background:var(--card);border:1px solid var(--rule);border-radius:var(--radius2);padding:15px 17px}
+.kpi-v{font-family:var(--disp);font-size:30px;line-height:1;color:var(--gold);margin-bottom:4px}
+.kpi-v.g{color:var(--grn)}.kpi-v.m{color:var(--t1)}.kpi-v.pu{color:var(--pur)}
+.kpi-l{font-size:10px;color:var(--t2);letter-spacing:1px;text-transform:uppercase}
+.kpi-s{font-size:10px;color:var(--t3);margin-top:1px}
+
+.net-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:9px}
+.nc{
+  background:var(--card);border:1px solid var(--rule);border-radius:var(--radius2);
+  padding:15px 17px;cursor:pointer;transition:all .12s;position:relative;overflow:hidden;
+}
+.nc:hover{border-color:var(--rule2);background:var(--card2);transform:translateY(-1px)}
+.nc.live{border-color:rgba(34,197,94,.18)}
+.nc.live::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--grn);opacity:.55}
+.nc-hd{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:11px}
+.nc-name{font-family:var(--disp);font-size:16px;letter-spacing:.5px;line-height:1}
+.nc-state{font-size:10px;color:var(--t2);letter-spacing:1px;margin-top:2px}
+.nc-sv{font-family:var(--disp);font-size:24px;line-height:1;color:var(--t3);text-align:right}
+.nc.live .nc-sv{color:var(--gold)}
+.nc-sl{font-size:9px;color:var(--t3);letter-spacing:1px;text-align:right}
+.nc-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;padding-top:9px;border-top:1px solid var(--rule)}
+.ncs-v{font-family:var(--mono);font-size:13px;color:var(--t0);font-weight:500}
+.ncs-l{font-size:9px;color:var(--t3);letter-spacing:.8px;text-transform:uppercase;margin-top:1px}
+.nc-empty{padding-top:9px;border-top:1px solid var(--rule);font-size:11px;color:var(--t3);font-style:italic}
+.nc-cta{
+  margin-top:8px;width:100%;padding:6px;background:transparent;
+  border:1px dashed var(--rule2);border-radius:var(--radius);
+  color:var(--t2);font-size:11px;cursor:pointer;transition:all .12s;font-family:var(--font);
+}
+.nc-cta:hover{border-color:var(--g-bd);color:var(--gold);background:var(--g-bg)}
+/* Airstream brand card — silver accent in place of green */
+.nc.brand{border-color:rgba(200,208,219,.2);background:linear-gradient(180deg,var(--card) 0%,rgba(200,208,219,.025) 100%)}
+.nc.brand::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#e8edf3 0%,#9aa6b5 100%);opacity:.7}
+.nc.brand.live .nc-sv{color:#e8edf3}
+.nc.brand .nc-state{color:#9aa6b5;letter-spacing:1.4px}
+.nc.brand:hover{border-color:rgba(200,208,219,.35)}
+/* Brand section header above the Airstream card on Network view */
+.brand-section{margin-top:24px;padding-top:18px;border-top:1px dashed var(--rule)}
+.brand-section .slbl{color:#9aa6b5;letter-spacing:4px}
+.brand-section .slbl em{color:#e8edf3;font-style:normal;font-weight:400}
+.brand-grid{display:grid;grid-template-columns:minmax(255px,1fr);max-width:520px;gap:9px}
+
+/* ══ BASEBALL CARDS ════════════════════════════════════════════ */
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:9px;margin-bottom:28px}
+.bc{
+  background:var(--card);border:1px solid var(--rule);border-radius:var(--radius2);
+  overflow:hidden;position:relative;transition:transform .12s,box-shadow .12s;
+  animation:rise .3s both;
+}
+.bc:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.bc.starter{
+  border-color:var(--g-bd);
+  background:linear-gradient(160deg,rgba(245,166,35,.05) 0%,var(--card) 52px);
+}
+.bc.starter::before,.bc.lineup::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.bc.starter::before{background:var(--gold)}
+.bc.lineup::before{background:var(--blu);opacity:.55}
+.bc.dh::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--pur);opacity:.7}
+.bc.dh .bc-pos{color:var(--pur)}
+.bc.dh .bc-score{color:var(--pur)}
+/* card top section */
+.bc-top{padding:12px 13px 9px;display:flex;align-items:flex-start;justify-content:space-between;border-bottom:1px solid var(--rule)}
+.bc-pos{font-family:var(--disp);font-size:32px;line-height:1;color:var(--t3);min-width:32px}
+.bc.starter .bc-pos{color:var(--gold)}.bc.lineup .bc-pos{color:var(--blu)}
+.bc-id{flex:1;padding:0 8px}
+.bc-name{font-family:var(--disp);font-size:15px;letter-spacing:.4px;line-height:1.2;color:var(--t0)}
+.bc-team{font-size:9px;color:var(--t3);letter-spacing:1.2px;text-transform:uppercase;margin-top:2px}
+.bc-sc{text-align:right}
+.bc-score{font-family:var(--disp);font-size:27px;line-height:1;color:var(--t2)}
+.bc.starter .bc-score{color:var(--gold)}.bc.lineup .bc-score{color:var(--blu)}
+.bc-max{font-size:9px;color:var(--t3);letter-spacing:1px}
+/* badge + trend */
+.bc-meta{padding:5px 13px 0;display:flex;align-items:center;gap:6px}
+.lbadge{display:inline-block;padding:2px 7px;border-radius:3px;font-size:9px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase}
+.lb-s{background:var(--g-bg);color:var(--gold);border:1px solid var(--g-bd)}
+.lb-l{background:var(--b-bg);color:var(--blu);border:1px solid rgba(59,130,246,.2)}
+.lb-b{background:var(--ink3);color:var(--t2);border:1px solid var(--rule)}
+.lb-dh{background:var(--p-bg);color:var(--pur);border:1px solid rgba(139,92,246,.35)}
+.trend{font-size:11px;font-weight:600}
+.up{color:var(--grn)}.dn{color:var(--red)}.eq{color:var(--t3)}
+/* bars */
+.bc-bars{padding:9px 13px 11px}
+.brow{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.bn{font-size:10px;color:var(--t2);width:68px;flex-shrink:0}
+.bt{flex:1;height:3px;background:var(--rule);border-radius:2px;overflow:hidden}
+.bf{height:100%;border-radius:2px;transition:width .8s cubic-bezier(.4,0,.2,1)}
+.bf-c{background:var(--grn)}.bf-v{background:var(--blu)}.bf-s{background:var(--gold)}
+.bf-n{background:var(--pur)}.bf-f{background:var(--ora)}
+.bp{font-family:var(--mono);font-size:10px;color:var(--t2);width:30px;text-align:right;flex-shrink:0}
+/* stat grid */
+.bc-stats{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--rule)}
+.bs{padding:7px 13px;border-right:1px solid var(--rule)}
+.bs:nth-child(3n){border-right:none}
+.bs:nth-child(n+4){border-top:1px solid var(--rule)}
+.bs-v{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--t0)}
+.bs-sub{display:block;font-family:var(--mono);font-size:10px;color:var(--t2);margin-top:2px;font-weight:400}
+.bs-l{font-size:9px;color:var(--t3);letter-spacing:.8px;text-transform:uppercase;margin-top:1px}
+.bc-note{padding:7px 13px 10px;border-top:1px solid var(--rule);font-size:11px;color:#fc8181;line-height:1.5}
+
+/* v4.3.4: Airstream per-store rollup boxes */
+.store-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:9px;margin-bottom:28px}
+.sbox{
+  background:var(--card);
+  border:1px solid rgba(200,208,219,.18);
+  border-radius:var(--radius2);
+  padding:12px 13px 10px;
+  position:relative;
+}
+.sbox::before{
+  content:'';
+  position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,#e8edf3 0%,#9aa6b5 100%);
+  opacity:.55;
+  border-radius:var(--radius2) var(--radius2) 0 0;
+}
+.sbox-name{
+  font-family:var(--disp);
+  font-size:13px;
+  letter-spacing:.5px;
+  color:#e8edf3;
+  margin-bottom:9px;
+  line-height:1.2;
+  min-height:30px;
+}
+.sbox-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:7px}
+.sb{text-align:center}
+.sb-v{font-family:var(--disp);font-size:18px;color:var(--t0);line-height:1}
+.sb-l{font-size:9px;color:var(--t3);letter-spacing:.6px;text-transform:uppercase;margin-top:2px}
+.sbox-foot{font-size:10px;color:var(--t3);letter-spacing:.4px;text-align:right;border-top:1px solid var(--rule);padding-top:6px}
+
+/* v4.3.4: Per-rep dealer breakdown (Airstream cards only) */
+.dlr{border-top:1px solid var(--rule)}
+.dlr-toggle{
+  cursor:pointer;padding:8px 13px;font-size:11px;color:var(--t2);
+  list-style:none;user-select:none;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.dlr-toggle::-webkit-details-marker{display:none}
+.dlr-toggle:hover{color:#e8edf3;background:rgba(200,208,219,.03)}
+.dlr-summary{color:var(--t3);font-size:10px;letter-spacing:.3px}
+.dlr[open] .dlr-toggle{color:#e8edf3;border-bottom:1px solid var(--rule)}
+.dlr-body{padding:5px 0}
+.dlr-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:6px 13px;font-size:11px;
+  border-bottom:1px solid rgba(255,255,255,.03);
+}
+.dlr-row:last-child{border-bottom:none}
+.dlr-name{color:var(--t1);flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dlr-stats{display:flex;gap:11px;font-family:var(--mono);font-size:10.5px;flex-shrink:0}
+.dlr-stat{color:var(--t2)}
+.dlr-stat.up{color:var(--grn)}
+.dlr-stat.dn{color:var(--red)}
+.dlr-stat.eq{color:var(--gold)}
+/* speed pill */
+.sp{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+.sp-f{background:var(--g2-bg);color:var(--grn)}
+.sp-s{background:var(--g-bg);color:var(--gold)}
+.sp-p{background:var(--b-bg);color:var(--blu)}
+.sp-m{background:var(--r-bg);color:var(--red)}
+.sp-n{background:var(--ink3);color:var(--t2)}
+
+/* ══ SCORECARD TABLE ═══════════════════════════════════════════ */
+.tshell{border:1px solid var(--rule);border-radius:var(--radius2);overflow:hidden;margin-bottom:10px}
+.tscroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;white-space:nowrap}
+thead{background:var(--ink3)}
+th{padding:8px 11px;text-align:left;font-size:9px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);border-bottom:1px solid var(--rule)}
+th.r{text-align:right}th.c{text-align:center}
+tbody tr{border-bottom:1px solid var(--rule);transition:background .1s}
+tbody tr:hover{background:rgba(255,255,255,.02)}
+tbody tr.sr{background:rgba(245,166,35,.04)}
+tbody tr:last-child{border-bottom:none}
+td{padding:8px 11px;font-family:var(--mono);font-size:11px;color:var(--t1)}
+td.nm{font-family:var(--font);font-size:12px;font-weight:500;color:var(--t0)}
+td.r{text-align:right}td.c{text-align:center}
+.scnum{font-family:var(--disp);font-size:16px}
+.sh{color:var(--gold)}.sm{color:var(--blu)}.sl{color:var(--t3)}
+.pnum{font-family:var(--disp);font-size:15px;color:var(--t3)}.pg{color:var(--gold)}
+.cg{color:var(--grn)}.ca{color:var(--gold)}.cr{color:var(--red)}
+.cp{color:var(--grn)}.cn{color:var(--t3)}
+
+/* ══ SUMMARY PANELS ════════════════════════════════════════════ */
+.kpi-r5{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:16px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:11px}
+.full{grid-column:1/-1}
+.panel{background:var(--card);border:1px solid var(--rule);border-radius:var(--radius2);padding:15px 17px}
+.panel-t{font-family:var(--disp);font-size:10px;letter-spacing:3px;color:var(--t2);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--rule)}
+.panel-t em{color:var(--gold);font-style:normal}
+.cal{border-left:2px solid var(--gold);padding:9px 13px;background:var(--g-bg);border-radius:0 5px 5px 0;margin-bottom:8px;font-size:12px;color:var(--t1);line-height:1.7}
+.cal.red{border-left-color:var(--red);background:var(--r-bg)}
+.cal.grn{border-left-color:var(--grn);background:var(--g2-bg)}
+.cal-h{font-family:var(--disp);font-size:11px;letter-spacing:2px;color:var(--t0);margin-bottom:4px}
+.cal.red .cal-h{color:#fc8181}.cal.grn .cal-h{color:var(--grn)}
+.plist{list-style:none}
+.plist li{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--rule);font-size:12px;color:var(--t1);line-height:1.65}
+.plist li:last-child{border-bottom:none}
+.pn{font-family:var(--disp);font-size:18px;color:var(--gold);min-width:16px;line-height:1.1}
+.dnote{background:var(--r-bg);border:1px solid rgba(239,68,68,.18);border-radius:var(--radius2);padding:11px 15px;font-size:12px;color:var(--t1);line-height:1.75;margin-bottom:14px}
+.dnote strong{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--red);display:block;margin-bottom:4px}
+
+/* ══ AI COACHING ═══════════════════════════════════════════════ */
+.ai-prompt{display:flex;gap:7px;align-items:center;background:var(--card);border:1px solid var(--rule2);border-radius:var(--radius2);padding:9px 13px;margin-bottom:13px;transition:border-color .15s}
+.ai-prompt:focus-within{border-color:rgba(139,92,246,.4)}
+.ai-prompt input{flex:1;background:transparent;border:none;outline:none;font-family:var(--font);font-size:13px;color:var(--t0)}
+.ai-prompt input::placeholder{color:var(--t3)}
+.aicg{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:9px}
+.aic{background:var(--card);border:1px solid var(--rule);border-radius:var(--radius2);padding:14px 16px;position:relative;overflow:hidden}
+.aic::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(139,92,246,.4),transparent)}
+.aic-ico{font-size:15px;margin-bottom:6px}
+.aic-t{font-size:13px;font-weight:600;color:var(--t0);margin-bottom:6px}
+.aic-b{font-size:11px;color:var(--t1);line-height:1.75}
+.aic-b strong{color:var(--t0)}
+.aic-src{font-size:10px;color:var(--t3);margin-top:8px}
+.ai-think{display:none;align-items:center;gap:9px;padding:10px 14px;background:var(--card);border:1px solid var(--rule);border-radius:var(--radius2);font-size:12px;color:var(--t1);margin-bottom:10px}
+.spin{width:13px;height:13px;border:2px solid var(--rule2);border-top-color:var(--pur);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+.ai-res{display:none;background:var(--card);border:1px solid var(--rule);border-radius:var(--radius2);padding:14px 16px;font-size:12px;color:var(--t1);line-height:1.8;white-space:pre-wrap;margin-bottom:11px;max-height:320px;overflow-y:auto}
+
+/* ══ METHODOLOGY ═══════════════════════════════════════════════ */
+.mg{display:grid;grid-template-columns:repeat(auto-fill,minmax(265px,1fr));gap:9px;margin-bottom:13px}
+.mc{background:var(--card);border:1px solid var(--rule);border-radius:var(--radius2);padding:13px 15px}
+.mc-h{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.mpct{font-family:var(--disp);font-size:21px;line-height:1}
+.mn{font-size:13px;font-weight:600;color:var(--t0)}
+.md{font-size:11px;color:var(--t1);line-height:1.7;list-style:none}
+.md li{padding-left:11px;position:relative;margin-bottom:2px}
+.md li::before{content:'✓';position:absolute;left:0;color:var(--grn);font-size:9px;top:2px}
+
+/* ══ EMPTY STATE ═══════════════════════════════════════════════ */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:56px 28px;min-height:440px}
+.empty-ico{font-size:40px;opacity:.3;margin-bottom:15px}
+.empty-t{font-family:var(--disp);font-size:22px;letter-spacing:2px;color:var(--t1);margin-bottom:6px}
+.empty-b{font-size:13px;color:var(--t2);line-height:1.75;max-width:390px;margin-bottom:20px}
+.empty-steps{display:flex;gap:9px;margin-bottom:20px;flex-wrap:wrap;justify-content:center}
+.estep{background:var(--card);border:1px solid var(--rule);border-radius:var(--radius2);padding:12px 14px;max-width:160px;text-align:left}
+.estep-n{font-family:var(--disp);font-size:18px;color:var(--gold);margin-bottom:3px}
+.estep-t{font-size:12px;font-weight:500;color:var(--t0);margin-bottom:2px}
+.estep-d{font-size:11px;color:var(--t2);line-height:1.5}
+.empty-btns{display:flex;gap:7px;flex-wrap:wrap;justify-content:center}
+
+/* ══ MODALS / OVERLAYS ═════════════════════════════════════════ */
+.ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(5px);padding:18px}
+.ov.open{display:flex}
+.modal{background:var(--ink1);border:1px solid var(--rule2);border-radius:var(--radius2);padding:22px;position:relative;width:100%;animation:rise .18s both}
+.modal.sm{max-width:430px}.modal.md{max-width:530px}.modal.lg{max-width:640px}
+.mcl{position:absolute;top:12px;right:14px;font-size:15px;cursor:pointer;color:var(--t2);background:none;border:none;padding:4px;line-height:1;transition:color .12s}
+.mcl:hover{color:var(--t0)}
+.modal h2{font-family:var(--disp);font-size:20px;letter-spacing:1.5px;margin-bottom:4px}
+.modal p{font-size:12px;color:var(--t1);line-height:1.7;margin-bottom:14px}
+.drop-z{border:1px dashed var(--rule2);border-radius:var(--radius2);padding:28px;text-align:center;cursor:pointer;transition:all .14s;margin-bottom:12px}
+.drop-z:hover,.drop-z.over{border-color:var(--g-bd);background:var(--g-bg)}
+.dz-ico{font-size:25px;margin-bottom:8px;opacity:.5}
+.dz-main{font-size:13px;font-weight:500;color:var(--t0);margin-bottom:2px}
+.dz-sub{font-size:11px;color:var(--t2)}
+.flist{max-height:115px;overflow-y:auto;margin-bottom:12px}
+.fi{display:flex;align-items:center;gap:7px;padding:6px 9px;background:var(--ink3);border-radius:var(--radius);margin-bottom:4px;font-size:12px;color:var(--t1)}
+.fi-n{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fi-s{font-family:var(--mono);font-size:10px;color:var(--t3)}
+.mfoot{display:flex;gap:7px;justify-content:flex-end}
+/* history table */
+.ht{width:100%;border-collapse:collapse;font-size:12px}
+.ht th{padding:7px 10px;text-align:left;font-size:9px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);border-bottom:1px solid var(--rule)}
+.ht th.r{text-align:right}
+.ht td{padding:7px 10px;border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:11px;color:var(--t1)}
+.ht tr:last-child td{border-bottom:none}
+.ht tr:hover td{background:rgba(255,255,255,.01)}
+.wb{display:inline-block;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:600;letter-spacing:.8px}
+.wb-c{background:var(--g-bg);color:var(--gold);border:1px solid var(--g-bd)}
+.wb-p{background:var(--ink3);color:var(--t3);border:1px solid var(--rule)}
+/* toast */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--card);border:1px solid var(--rule2);border-radius:var(--radius2);padding:10px 16px;font-size:12px;color:var(--t0);z-index:9999;animation:rise .2s both;max-width:340px;box-shadow:0 10px 36px rgba(0,0,0,.5)}
+
+/* ══ DATE RANGE PICKER ═════════════════════════════════════════ */
+.tag-dr-btn{
+  cursor:pointer;font-size:10px;font-weight:500;
+  background:var(--b-bg);color:var(--blu);border-color:rgba(59,130,246,.18);
+  border:1px solid rgba(59,130,246,.18);
+  display:inline-flex;align-items:center;gap:3px;
+  transition:all .14s;user-select:none;
+  font-family:var(--font);
+}
+.tag-dr-btn:hover{background:rgba(59,130,246,.15);border-color:rgba(59,130,246,.4)}
+.tag-dr-active{background:var(--g-bg)!important;color:var(--gold)!important;border-color:var(--g-bd)!important}
+
+.dr-panel{
+  display:none;
+  padding:10px 24px 11px;
+  background:var(--ink1);border-bottom:2px solid var(--gold);
+  animation:rise .14s both;
+}
+.dr-panel.dr-open{display:block}
+.dr-wrap{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.dr-label{font-size:9px;color:var(--t3);letter-spacing:1.2px;text-transform:uppercase;white-space:nowrap;margin-right:2px}
+.dr-btn{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:4px 11px;border-radius:5px;
+  background:var(--ink3);border:1px solid var(--rule2);
+  color:var(--t1);font-size:11px;font-family:var(--font);
+  cursor:pointer;transition:all .12s;white-space:nowrap;
+}
+.dr-btn:hover{border-color:var(--gold);color:var(--gold);background:var(--g-bg)}
+.dr-btn.active{background:var(--g-bg);border-color:var(--g-bd);color:var(--gold);font-weight:600}
+.dr-sep{width:1px;height:16px;background:var(--rule2);margin:0 2px}
+.dr-dates{display:flex;align-items:center;gap:5px}
+.dr-input{
+  background:var(--ink3);border:1px solid var(--rule2);
+  color:var(--t0);font-family:var(--mono);font-size:11px;
+  padding:4px 8px;border-radius:5px;cursor:pointer;
+  transition:border-color .12s;
+}
+.dr-input:focus{outline:none;border-color:var(--gold)}
+.dr-input::-webkit-calendar-picker-indicator{filter:invert(.4) sepia(1) saturate(3) hue-rotate(10deg);cursor:pointer;opacity:.7}
+.dr-input.dr-disabled{opacity:.35;cursor:not-allowed}
+.dr-to{font-size:10px;color:var(--t3);padding:0 2px}
+.dr-clear{
+  background:var(--r-bg);border:1px solid rgba(239,68,68,.25);
+  color:var(--red);font-size:11px;font-family:var(--font);
+  cursor:pointer;padding:4px 10px;border-radius:5px;transition:all .12s;line-height:1;
+}
+.dr-clear:hover{background:rgba(239,68,68,.18)}
+
+/* ══ SPLIT-DATE EXPLAINERS (v4.3.7) ════════════════════════════
+   Two surfaces for the split-date pipeline:
+   .dr-info   - explainer line shown inside the date-range panel
+                when a filter is active. Compact, low-key — sits
+                under the controls.
+   .split-note - more prominent callout between the KPI strip and
+                 the rooftop grid on the Network view, surfacing
+                 the prior-period delivery count. Only appears when
+                 a filter is active AND at least one delivery came
+                 from a pre-period lead.
+═══════════════════════════════════════════════════════════════ */
+.dr-info{
+  width:100%;
+  margin-top:8px;padding:7px 10px;
+  background:var(--b-bg);border-left:2px solid rgba(59,130,246,.45);
+  border-radius:3px;
+  font-size:11px;line-height:1.55;color:var(--t1);
+}
+.split-note{
+  display:flex;align-items:flex-start;gap:10px;
+  margin:12px 0 14px;
+  padding:11px 14px;
+  background:var(--b-bg);border:1px solid rgba(59,130,246,.22);
+  border-radius:var(--radius);
+  font-size:12px;line-height:1.55;color:var(--t1);
+}
+.split-note .sn-ico{
+  flex-shrink:0;font-size:13px;color:var(--blu);
+  margin-top:1px;
+}
+.split-note strong{color:var(--t0);font-weight:600}
+
+/* v4.3.9 — Warning line shown inside the date-range panel when the
+   user has picked a filter but there's no row source to re-score
+   against. Gold/amber so it reads as cautionary without being scary
+   (red is reserved for destructive actions). The inline CTA lets the
+   user remediate without leaving the modal. */
+.dr-warn{
+  width:100%;
+  margin-top:8px;padding:8px 11px;
+  background:var(--g-bg);border-left:2px solid rgba(245,166,35,.55);
+  border-radius:3px;
+  font-size:11px;line-height:1.55;color:var(--t0);
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+}
+.dr-warn-cta{
+  background:transparent;border:1px solid rgba(245,166,35,.45);
+  color:var(--gold);font-size:11px;
+  padding:3px 9px;border-radius:4px;
+  cursor:pointer;font-family:var(--font);font-weight:500;
+  margin-left:auto;
+  transition:all .12s;
+}
+.dr-warn-cta:hover{background:rgba(245,166,35,.12);border-color:rgba(245,166,35,.7)}
+
+/* ══ HISTORY CLEAR CONTROLS ════════════════════════════════════ */
+.hist-store-group{margin-bottom:4px}
+.hist-store-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:6px 10px;background:var(--ink3);border-radius:5px;
+  margin-bottom:2px;
+}
+.hist-store-name{font-family:var(--font);font-size:12px;font-weight:600;color:var(--t0)}
+.hist-store-meta{font-size:10px;color:var(--t3)}
+.hist-store-actions{display:flex;gap:5px}
+.btn-clear-store{
+  background:transparent;border:1px solid var(--rule2);
+  color:var(--t2);font-size:10px;padding:3px 9px;border-radius:4px;
+  cursor:pointer;font-family:var(--font);transition:all .12s;
+}
+.btn-clear-store:hover{border-color:var(--red);color:var(--red);background:var(--r-bg)}
+.hist-row-del{
+  background:transparent;border:none;color:var(--t3);
+  cursor:pointer;padding:2px 5px;font-size:12px;transition:color .12s;
+}
+.hist-row-del:hover{color:var(--red)}
+.hist-clear-all{
+  background:var(--r-bg);border:1px solid rgba(239,68,68,.25);color:var(--red);
+  font-size:11px;padding:5px 14px;border-radius:5px;cursor:pointer;
+  font-family:var(--font);font-weight:500;transition:all .12s;
+}
+.hist-clear-all:hover{background:rgba(239,68,68,.18)}
+
+/* v4.3.9 — Non-destructive local actions in the History modal.
+   Visually distinct from the red "Clear All Server Data" buttons so
+   users don't fear clicking them. Refresh-from-server uses the AI
+   purple (matches existing btn-ai pattern, signals "live action").
+   Clear-local-cache uses a yellow caution tone — reversible (data
+   is on the server) but you'll lose any in-session state. */
+.local-action{
+  font-size:11px;padding:5px 14px;border-radius:5px;
+  cursor:pointer;font-family:var(--font);font-weight:500;
+  transition:all .12s;border:1px solid transparent;
+}
+.local-refresh{
+  background:var(--p-bg);border-color:rgba(139,92,246,.3);color:var(--pur);
+}
+.local-refresh:hover{background:rgba(139,92,246,.14);border-color:rgba(139,92,246,.5)}
+.local-clear{
+  background:var(--g-bg);border-color:rgba(245,166,35,.28);color:var(--gold);
+}
+.local-clear:hover{background:rgba(245,166,35,.14);border-color:rgba(245,166,35,.45)}
+
+/* ══ ANIMATIONS ════════════════════════════════════════════════ */
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.bc:nth-child(1){animation-delay:.02s}.bc:nth-child(2){animation-delay:.04s}
+.bc:nth-child(3){animation-delay:.06s}.bc:nth-child(4){animation-delay:.08s}
+.bc:nth-child(5){animation-delay:.10s}.bc:nth-child(6){animation-delay:.12s}
+.bc:nth-child(7){animation-delay:.14s}.bc:nth-child(8){animation-delay:.16s}
+.bc:nth-child(9){animation-delay:.18s}.bc:nth-child(10){animation-delay:.20s}
+.bc:nth-child(11){animation-delay:.22s}.bc:nth-child(12){animation-delay:.24s}
+
+/* ══ RESPONSIVE ════════════════════════════════════════════════ */
+@media(max-width:1000px){.kpi5,.kpi-r5{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:760px){.two{grid-template-columns:1fr}.kpi5,.kpi-r5{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){
+  .tb-row1,.ctx,.vwrap{padding-left:14px;padding-right:14px}
+  .store-rail,.sec-rail{padding:0 14px}
+  .wm-sub{display:none}
+  .kpi5,.kpi-r5{grid-template-columns:1fr 1fr}
+  .tb-actions .btn-ghost{display:none}
+}
+
+/* ══ BOOT LOADER (v4.3.5) ═════════════════════════════════════
+   Suppresses paint of cached/stale localStorage data on initial
+   page load. The page stays in #boot state until the server
+   hydration round-trip resolves (or times out), then atomically
+   reveals the rendered content. Eliminates the brief flash where
+   stale local data paints first and then gets corrected ~300ms
+   later — that flash was producing the "different numbers in
+   different browsers" perception even though server state was
+   already consistent.
+═══════════════════════════════════════════════════════════════ */
+html.booting #page,
+html.booting .store-rail .s-tab:not(.net),
+body.booting #page,
+body.booting .store-rail .s-tab:not(.net){
+  visibility:hidden;
+}
+#boot{
+  position:fixed;top:0;left:0;right:0;bottom:0;
+  background:var(--ink0);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:14px;
+  z-index:500;
+  opacity:1;transition:opacity .25s ease;
+  pointer-events:none;
+}
+#boot.boot-done{opacity:0}
+.boot-gem{
+  width:34px;height:34px;
+  background:var(--gold);
+  clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%);
+  animation:bootPulse 1.4s ease-in-out infinite;
+}
+@keyframes bootPulse{
+  0%,100%{opacity:.35;transform:scale(.94)}
+  50%{opacity:1;transform:scale(1.04)}
+}
+.boot-msg{
+  font-family:var(--disp);font-size:14px;letter-spacing:2px;
+  color:var(--t2);text-transform:uppercase;
+}
+.boot-sub{
+  font-size:10px;color:var(--t3);letter-spacing:1.2px;
+  text-transform:uppercase;
+}
+
+/* Sync badge — small "syncing latest data" indicator in topbar
+   shown if a *subsequent* hydration is in flight (e.g. user
+   uploaded in another tab; we're pulling the new snapshot). Boot
+   loader handles the initial load, this handles the live case. */
+#sync-badge{
+  display:none;align-items:center;gap:6px;
+  padding:3px 9px;border-radius:99px;
+  background:var(--p-bg);border:1px solid rgba(139,92,246,.3);
+  font-size:10px;color:var(--pur);letter-spacing:.8px;text-transform:uppercase;
+}
+#sync-badge.on{display:inline-flex}
+#sync-badge .sb-dot{
+  width:5px;height:5px;border-radius:50%;
+  background:var(--pur);
+  animation:bootPulse 1.4s ease-in-out infinite;
+}
+</style>
+</head>
+<body class="booting">
+
+<!-- ══ BOOT LOADER (v4.3.5) ══════════════════════════════════════
+     Shown on initial load while we fetch the canonical scores from
+     the server. Hidden via .boot-done class once hydration settles
+     (or the safety timeout fires). Prevents the localStorage flash. -->
+<div id="boot">
+  <div class="boot-gem"></div>
+  <div class="boot-msg">Syncing Latest Data</div>
+  <div class="boot-sub">Loading scores from server</div>
+</div>
+
+<!-- ══ TOPBAR ═══════════════════════════════════════════════════ -->
+<div id="topbar">
+  <div class="tb-row1">
+    <div class="wm">
+      <div class="wm-gem"></div>
+      <div class="wm-name">GARV <em>Performance</em></div>
+      <div class="wm-sep"></div>
+      <div class="wm-sub">Network Dashboard</div>
+      <div id="sync-badge"><span class="sb-dot"></span>Syncing</div>
+    </div>
+    <div class="tb-actions">
+      <button class="btn btn-ghost" onclick="openHistory()">&#128197; History</button>
+      <button class="btn btn-ai" onclick="openAIModal()">&#10022; AI Coach</button>
+      <button class="btn btn-gold" onclick="openUpload()">&#8679; Upload Data</button>
+      <input type="file" id="file-input-hidden" accept=".csv" multiple style="display:none" onchange="handleFiles(this.files)">
+    </div>
+  </div>
+  <div class="store-rail" id="store-rail">
+    <div class="s-tab net active" id="tab-network" onclick="goStore('network')">&#127967; Network</div>
+  </div>
+</div>
+
+<!-- ══ PAGE (filled by JS) ════════════════════════════════════ -->
+<div id="page"></div>
+
+<!-- ══ UPLOAD MODAL ════════════════════════════════════════════ -->
+<div class="ov" id="ov-upload" onclick="if(event.target===this)closeOv('ov-upload')">
+  <div class="modal md">
+    <button class="mcl" onclick="closeOv('ov-upload')">&#10005;</button>
+    <h2>Upload Master Lead Report</h2>
+    <p>Store: <strong id="ul-lbl" style="color:var(--gold)">&#8212;</strong><br>
+    <span id="ul-helper">Drop a VinSolutions master lead export (<span style="color:var(--gold);font-family:var(--mono);font-size:11px">storename_master_leads_dd_mm_yy.csv</span>). 700 Credit and Airstream leads are removed automatically. The file contains both leads and showroom visits in one report.</span></p>
+    <div class="drop-z" id="drop-z"
+         onclick="document.getElementById('file-input-hidden').click()"
+         ondragover="event.preventDefault();this.classList.add('over')"
+         ondragleave="this.classList.remove('over')"
+         ondrop="event.preventDefault();this.classList.remove('over');handleFiles(event.dataTransfer.files)">
+      <div class="dz-ico">&#128194;</div>
+      <div class="dz-main">Drag &amp; drop the master CSV here</div>
+      <div class="dz-sub">One file &#183; Contains leads + visits merged</div>
+    </div>
+    <div class="flist" id="ul-flist"></div>
+    <div class="mfoot">
+      <button class="btn btn-ghost" onclick="closeOv('ov-upload')">Cancel</button>
+      <button class="btn btn-gold" id="proc-btn" onclick="processUpload()" disabled>Process &amp; Update Scores</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ HISTORY MODAL ═══════════════════════════════════════════ -->
+<div class="ov" id="ov-history" onclick="if(event.target===this)closeOv('ov-history')">
+  <div class="modal lg" style="max-width:720px">
+    <button class="mcl" onclick="closeOv('ov-history')">&#10005;</button>
+    <h2>Upload History</h2>
+    <p>All uploads per store. Trend arrows appear on baseball cards once two uploads exist. Clear any individual upload or an entire store's history &mdash; current store data is preserved separately.</p>
+    <div id="hist-content" style="max-height:420px;overflow-y:auto;margin-bottom:14px"></div>
+    <!-- v4.3.9 — Two-tier action row.
+         Top row: non-destructive local actions (refresh from server,
+                  clear browser cache). Safe to click any time.
+         Bottom row: destructive actions (clear history, wipe server). -->
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:9px;padding-bottom:9px;border-bottom:1px solid var(--rule)">
+      <span style="font-size:10px;color:var(--t3);letter-spacing:1.2px;text-transform:uppercase">This Browser</span>
+      <button class="local-action local-refresh" onclick="refreshFromServer()" title="Re-fetch every store's scores from the Netlify server. No data is changed. Useful if you want to confirm you're seeing the latest data.">&#8634; Refresh from Server</button>
+      <button class="local-action local-clear" onclick="clearLocalCacheOnly()" title="Wipe this browser's localStorage and reload. Server data is untouched and will re-hydrate on reload. Use this for support / debugging or after a code change.">&#9888; Clear Local Cache (This Browser)</button>
+    </div>
+    <div class="mfoot" style="justify-content:space-between;align-items:center">
+      <div style="display:flex;gap:7px;flex-wrap:wrap">
+        <button class="hist-clear-all" onclick="clearAllHistory()">&#128465; Clear All History</button>
+        <button class="hist-clear-all" onclick="clearAllBlobData()" style="background:var(--red);color:#fff">&#128465; Clear All Server Data</button>
+      </div>
+      <div style="display:flex;gap:7px">
+        <button class="btn btn-ghost" onclick="closeOv('ov-history')">Close</button>
+        <button class="btn btn-gold" onclick="closeOv('ov-history');openUpload()">&#8679; Upload New Week</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ AI COACH MODAL ══════════════════════════════════════════ -->
+<div class="ov" id="ov-ai" onclick="if(event.target===this)closeOv('ov-ai')">
+  <div class="modal md">
+    <button class="mcl" onclick="closeOv('ov-ai')">&#10005;</button>
+    <h2>&#10022; AI Coach</h2>
+    <p>Ask about any rep, store, or coaching strategy. Uses live data from the currently viewed store.</p>
+    <div class="ai-prompt" style="margin-bottom:10px">
+      <input id="ai-modal-inp" placeholder="e.g. 'What should bench reps focus on this week?' or 'Why is conversion dropping?'" onkeydown="if(event.key==='Enter')runAIModal()">
+      <button class="btn btn-ai" onclick="runAIModal()">&#10022; Ask</button>
+    </div>
+    <div class="ai-think" id="ai-modal-think"><div class="spin"></div> Analyzing team data&#8230;</div>
+    <div class="ai-res" id="ai-modal-res"></div>
+    <div class="mfoot"><button class="btn btn-ghost" onclick="closeOv('ov-ai')">Close</button></div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   BACKEND CONFIG
+   ─────────────────────────────────────────────────────────────
+   AI_PROXY / BACKEND_URL: Resolved from window.location.origin.
+   Set to blank string to force localStorage-only mode.
+══════════════════════════════════════════════════════════════ */
+const AI_PROXY    = window.location.origin + '/api/ai';
+const BACKEND_URL = window.location.origin;
+
+/* ══ STORE REGISTRY ══════════════════════════════════════════ */
+const STORES = [
+  {id:'hammond',       name:'Hammond',          st:'LA'},
+  {id:'grand_bay',     name:'Grand Bay',        st:'AL'},
+  {id:'heflin',        name:'Heflin',           st:'AL'},
+  {id:'calera',        name:'Calera',           st:'AL'},
+  {id:'huntsville',    name:'Huntsville',       st:'AL'},
+  {id:'hattiesburg',   name:'Hattiesburg',      st:'MS'},
+  {id:'tupelo',        name:'Tupelo',           st:'MS'},
+  {id:'breaux_bridge', name:'Breaux Bridge',    st:'LA'},
+  {id:'defuniak',      name:'Defuniak Springs', st:'FL'},
+  /* v4.3 (May 2026) — Brand tab. Cross-rooftop Airstream view.
+     Inverts the standard Airstream filter: only Airstream-identified
+     rows are kept, and they can originate from ANY of the nine
+     rooftops above PLUS the "Airstream of GARV" rooftop that never
+     had its own scorecard before. Same rep blacklist, same scoring
+     math, same lineup rules. 700 Credit still excluded. */
+  {id:'airstream',     name:'Airstream',        st:'BRAND', isAirstream:true},
+];
+
+/* ══ AIRSTREAM IDENTIFIERS ═══════════════════════════════════
+   A row counts as an Airstream lead if ANY of the INCLUSION rules
+   below match. Mirrors the VinSolutions saved filter used to
+   generate the Airstream master export:
+
+     [Lead Source] Contains "Airstream"
+     OR [Lead Source] Contains "Aimbase"
+     OR [Make]        Contains "Airstream"
+
+   Empirically (May 2026 export, 363 rows):
+     - "Aimbase-Hubspot Lead"  → 285 rows (78%)
+     - "Make = Airstream"      →  74 rows (20%)
+     - "Lead Source = Airstream" → 11 rows (3%)
+     - Plus long tail of Aimbase-* and Dtk-* Airstream-tagged sources.
+
+   Without the Aimbase rule we'd miss ~80% of the pipeline, so it's
+   non-negotiable for this tab. Matching is case-insensitive.
+
+   The BAD_LEAD_STATUS_* arrays implement the "Not = Bad" clauses
+   from the same VinSolutions filter. Currently no live rows match
+   "Bad" in either field, but enforcing the rule keeps the tab
+   aligned with the saved report as data evolves.
+═══════════════════════════════════════════════════════════════ */
+const AIRSTREAM_RULES = {
+  // Substring match against Lead Source — primary signal.
+  // "aimbase" catches Aimbase-Hubspot Lead, Aimbase-Contact A Dealer,
+  // Aimbase-Paid Lead, Aimbase-Request A Brochure - Mailed.
+  // "airstream" catches Airstream + Dtk Website (Best Price - Airstream).
+  LEAD_SOURCE_CONTAINS: [
+    'airstream',
+    'aimbase',
+  ],
+  // Substring match against Lead Source Group. Kept permissive in case
+  // future exports group Aimbase-* under "Manufacturer" or similar.
+  LEAD_SOURCE_GROUP_CONTAINS: [
+    'airstream',
+  ],
+  // Make-field substring match. Catches rows where Make column is
+  // populated ("Airstream", "AIRSTREAM").
+  MAKE_CONTAINS: [
+    'airstream',
+  ],
+  // Exact-match Bad-status values to reject (case-insensitive).
+  // Anything appearing in these lists EXCLUDES the row from the
+  // Airstream tab even if it otherwise matches the inclusion rules.
+  BAD_LEAD_STATUS_CUSTOM: [
+    'bad',
+  ],
+  BAD_LEAD_STATUS_TYPE: [
+    'bad',
+  ],
+};
+
+function isAirstreamLead(row, H){
+  const src  = (row[H.LEAD_SOURCE]     || '').trim().toLowerCase();
+  const grp  = (row[H.LEAD_SRC_GROUP]  || '').trim().toLowerCase();
+  const make = (row[H.MAKE]            || '').trim().toLowerCase();
+  if (src){
+    for (const v of AIRSTREAM_RULES.LEAD_SOURCE_CONTAINS)
+      if (src.includes(v.toLowerCase())) return true;
+  }
+  if (grp){
+    for (const v of AIRSTREAM_RULES.LEAD_SOURCE_GROUP_CONTAINS)
+      if (grp.includes(v.toLowerCase())) return true;
+  }
+  if (make){
+    for (const v of AIRSTREAM_RULES.MAKE_CONTAINS)
+      if (make.includes(v.toLowerCase())) return true;
+  }
+  return false;
+}
+
+// Returns true if the row should be DROPPED from the Airstream tab
+// because Lead Status Custom or Lead Status Type matches a "Bad" value.
+// Mirrors the [Lead Status Custom] Not = Bad AND [Lead Status Type] Not = Bad
+// clauses in the VinSolutions saved filter. Only used by the Airstream tab.
+function isAirstreamBadStatus(row, H){
+  const custom = (row[H.LEAD_STATUS_CUSTOM] || '').trim().toLowerCase();
+  const type   = (row[H.LEAD_STATUS_TYPE]   || '').trim().toLowerCase();
+  if (custom){
+    for (const v of AIRSTREAM_RULES.BAD_LEAD_STATUS_CUSTOM)
+      if (custom === v.toLowerCase()) return true;
+  }
+  if (type){
+    for (const v of AIRSTREAM_RULES.BAD_LEAD_STATUS_TYPE)
+      if (type === v.toLowerCase()) return true;
+  }
+  return false;
+}
+
+/* Turn a verbose VinSolutions dealer string into a short rooftop label.
+   Examples (real values seen in the May 2026 Airstream export):
+     "Great American RV SuperStores, Calera"        \u2192 "Calera"
+     "Great American RV SuperStores of Huntsville"  \u2192 "Huntsville"
+     "Great American RV SuperStores, Defuniak Springs" \u2192 "Defuniak Springs"
+     "Airstream of GARV"                            \u2192 "Airstream of GARV"
+     ""                                              \u2192 ""
+   Anything that doesn't match the prefix patterns is returned as-is. */
+function cleanDealerName(s){
+  if(!s) return '';
+  let out = s.trim();
+  // Strip the long GARV prefix in any of its known shapes.
+  out = out.replace(/^Great American RV SuperStores\s*[,]?\s*(of\s+)?/i, '');
+  return out.trim();
+}
+
+/* ══ STORAGE ═════════════════════════════════════════════════ */
+/*
+  v4.3.3 (May 2026) — PRIVACY: localStorage no longer contains the
+  raw master CSV (`_masterText`). The raw CSV contained full customer
+  PII (names, phone numbers, email addresses) and was sitting in
+  browser storage between sessions where it could be casually
+  inspected via DevTools \u2192 Application \u2192 Local Storage.
+
+  Now localStorage holds only computed results: reps, totals, period,
+  history snapshots. The raw CSV exists in browser memory only during
+  the upload's compute-and-sync window (~50ms) and is then dropped.
+
+  Trade-off: scoring rule changes no longer automatically re-score on
+  page load \u2014 the user must re-upload each store's CSV for new
+  rules to take effect. This is acceptable because (a) maintenance
+  uploads are infrequent, (b) the security gain is large, and (c) the
+  server-side blob still holds the raw CSV for future server-side
+  rescore if needed.
+
+  Old "garv7_" keys may still contain stale _masterText from before
+  this change. They are sanitized on next read via stripPII().
+*/
+
+// Fields that may contain customer PII and must never be persisted client-side.
+// Currently just `_masterText`, but kept as a list so future additions are easy.
+const PII_FIELDS = ['_masterText'];
+
+/* COLUMN-level PII list — the names of CSV header columns that contain
+   customer identifying info. Used when caching individual rows for
+   client-side date-range filtering. Every column NOT in this list is
+   operational data (dates, statuses, rep names, response times, etc.)
+   and is safe to persist. */
+const PII_COLUMN_HEADERS = [
+  'Customer',
+  'Email',
+  'Daytime Phone', 'Day Phone',
+  'Cell Phone',
+  'Evening Phone',
+  // Note: "Last Attempted Email Contact", "Last Customer Contact",
+  // "First Customer Contact", etc. are DATE columns despite the names —
+  // they are NOT stripped because they're needed for filtering and
+  // contain no customer-identifying content.
+];
+
+/* Returns the set of column indexes that should be nulled out before
+   caching a row for date-range filtering. Computed once per upload,
+   cached on the H object. */
+function piiColIndexes(H){
+  if(H._piiCols) return H._piiCols;
+  const cols = new Set();
+  for(const headerName of PII_COLUMN_HEADERS){
+    if(typeof H[headerName] === 'number') cols.add(H[headerName]);
+  }
+  // Also catch the duplicate "Customer" / "Dealer" columns (the CSV
+  // has two of each — the visits-section copies). Anything that
+  // matches a PII header name anywhere in H.allHeaders is stripped.
+  if(H.allHeaders){
+    for(let i = 0; i < H.allHeaders.length; i++){
+      const h = H.allHeaders[i];
+      for(const pii of PII_COLUMN_HEADERS){
+        if(h === pii){ cols.add(i); break; }
+      }
+    }
+  }
+  H._piiCols = cols;
+  return cols;
+}
+
+/* Returns a copy of a row array with PII columns replaced with empty
+   strings. Used before writing rows to localStorage. */
+function sanitizeRow(row, H){
+  const cols = piiColIndexes(H);
+  if(!cols.size) return row.slice();
+  const out = row.slice();
+  for(const i of cols) out[i] = '';
+  return out;
+}
+
+function stripPII(obj){
+  if(!obj || typeof obj !== 'object') return obj;
+  const clean = {};
+  for(const k of Object.keys(obj)){
+    if(PII_FIELDS.indexOf(k) !== -1) continue;
+    clean[k] = obj[k];
+  }
+  return clean;
+}
+
+const lsGet=(k)=>{try{return JSON.parse(localStorage.getItem('garv7_'+k))}catch{return null}};
+const lsSet=(k,v)=>{try{localStorage.setItem('garv7_'+k,JSON.stringify(v))}catch{}};
+
+function getStoreData(id){
+  const raw = lsGet('d_'+id);
+  if(!raw) return null;
+  // Defensive: sanitize on read in case legacy data from before v4.3.3
+  // still has _masterText. Also schedule a write-back to clean disk.
+  if(raw._masterText !== undefined){
+    const clean = stripPII(raw);
+    lsSet('d_'+id, clean);
+    return clean;
+  }
+  return raw;
+}
+
+function setStoreData(id,v){
+  // Always strip PII fields before persisting to localStorage. The
+  // caller can keep _masterText in memory if it needs to (e.g. to
+  // run a fresh recompute on date-range change immediately after
+  // upload), but only the sanitized version reaches disk.
+  lsSet('d_'+id, stripPII(v));
+}
+
+function getHist(id){return lsGet('h_'+id)||[]}
+function pushHist(id,snap){
+  // History snapshots also get sanitized \u2014 they used to inherit
+  // _masterText through object reference in older revisions.
+  const h=getHist(id);h.unshift(stripPII(snap));
+  if(h.length>20)h.pop();lsSet('h_'+id,h);
+  lsSet('hist_cleared_'+id,false);
+}
+
+/* ══ FILTER-ROWS CACHE (v4.3.4) ══════════════════════════════
+   To restore date-range filtering across page reloads without
+   re-storing the raw CSV (which leaked customer PII), we cache the
+   parsed rows with all PII columns nulled out. This is enough for
+   recompute() to re-filter by date because all the columns it reads
+   (LEAD_ORIG, LEAD_MOD, LEAD_STATUS_TYPE, SALES_REP, MAKE, dates,
+   etc.) are operational data, not PII.
+
+   Cache key: garv7_rs_<storeId>
+   Cache shape: { rows: [[...sanitized cells...], ...], H: {col -> idx},
+                  fileName, uploadedAt }
+
+   On a 425 KB raw CSV this typically saves to ~380 KB after PII
+   stripping (5 columns out of 87 nulled). Still larger than computed
+   scores alone but acceptable.
+═══════════════════════════════════════════════════════════════ */
+function setFilterRows(storeId, parsed, fileName){
+  if(!parsed || !parsed.rows || !parsed.H) return;
+  const H = parsed.H;
+  // v4.3.4 (fixed): Run customer dedup BEFORE stripping PII.
+  // dedupCustomers reads Customer/Email/Phone to identify the same
+  // person across rows; if we blanked those columns first, no dups
+  // would merge and the cached row set would over-count leads and
+  // deliveries on re-score. The dedup is idempotent \u2014 running
+  // recompute() later on already-deduped rows is a no-op for dedup
+  // and yields identical numbers to the original CSV.
+  const deduped = dedupCustomers(parsed.rows, H);
+  const sanitized = deduped.map(r => sanitizeRow(r, H));
+  // We persist a SHALLOW H that only contains the integer indexes
+  // plus allHeaders, NOT the _piiCols Set (Sets don't survive JSON
+  // serialization). Aliases are recomputed by clients on read.
+  const Hcopy = {};
+  for(const k of Object.keys(H)){
+    if(k === '_piiCols') continue;
+    if(typeof H[k] === 'number' || k === 'allHeaders') Hcopy[k] = H[k];
+  }
+  lsSet('rs_'+storeId, {
+    rows: sanitized,
+    H: Hcopy,
+    fileName: fileName || '',
+    uploadedAt: new Date().toISOString(),
+  });
+}
+function getFilterRows(storeId){ return lsGet('rs_'+storeId); }
+function hasFilterRows(storeId){ return !!lsGet('rs_'+storeId); }
+function clearFilterRows(storeId){ lsSet('rs_'+storeId, null); }
+
+/* ══ STATE ═══════════════════════════════════════════════════ */
+let curStore='network', curSec='lineup', ulTarget='hammond', pending=[];
+let activeDR='mtd', drFrom='', drTo='';
+
+/*
+  In-memory cache of raw master CSVs by storeId. Populated when a CSV
+  is uploaded in this tab, and when the server returns one during
+  initial hydration. NEVER written to localStorage \u2014 it exists
+  only for the lifetime of the page so date-range re-scoring still
+  works during the active session. Reload = empty cache = date pickers
+  disabled until next upload.
+*/
+const _masterCache = {};
+function setRawCSV(storeId, text){ _masterCache[storeId] = text; }
+function getRawCSV(storeId){ return _masterCache[storeId] || null; }
+function hasRawCSV(storeId){ return !!_masterCache[storeId]; }
+
+/* ══ HELPERS ═════════════════════════════════════════════════ */
+const pct  = v=>(v*100).toFixed(1)+'%';
+const fmtT = v=>{if(v===null||v===undefined)return'N/A';if(v===0)return'<1m';if(v<60)return v+'m';return(v/60).toFixed(1)+'h'};
+const scCls= s=>s>=60?'sh':s>=45?'sm':'sl';
+const pCls = v=>v>=.15?'cg':v>=.09?'ca':'cr';
+const pill = t=>{const m={Full:'sp-f',Strong:'sp-s',Partial:'sp-p',Minimum:'sp-m','N/A':'sp-n'};return'<span class="sp '+( m[t]||'sp-n')+'">'+t+'</span>'};
+const today= ()=>new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+
+/* v4.3.7 — Plain-text explainer for the split-date pipeline, attached
+   as a `title` tooltip on every calendar pill across the dashboard.
+   This is the most-confusing-on-first-look behavior in the entire app
+   (why do leads drop but deliveries hold when MTD is applied?) so it
+   gets explicit surfacing. Phrasing intentionally short — fits in the
+   native browser tooltip without truncation. */
+const SPLIT_DATE_TOOLTIP =
+  'Date filter applies to TWO fields:\n' +
+  ' \u2022 LEADS  \u2192 filtered by Lead Origination Date\n' +
+  ' \u2022 DELIVERIES \u2192 filtered by Lead Last Modified Date (sale date)\n\n' +
+  'A lead originated last month that closes this month counts as a delivery this month, not a lead this month. This is why deliveries can hold steady while leads drop when you narrow the window.';
+
+/* v4.3.7 — Convert a YYYY-MM-DD date string to a short display form
+   like "5/3" or "May 1". Used in the period labels on filtered store
+   cards so leadership sees the exact window applied. */
+function fmtDateShort(s){
+  if(!s) return '';
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(!m) return s;
+  return parseInt(m[2],10)+'/'+parseInt(m[3],10);
+}
+/* Build a human period label given the active state. Centralized here
+   because the same logic was duplicated in netHTML, buildPage, and
+   the per-store card renderer. Falls back to a sensible default when
+   no filter is set.
+
+   v4.3.8 — Accepts an optional `dataRange = { min, max }` (YYYY-MM-DD
+   strings) representing the actual data window currently loaded. When
+   supplied, the date pair inside the label is intersected with the
+   data range so the label reflects what the user actually has data
+   for, not the wall clock.
+
+   Examples (today = 5/27):
+     MTD, data 5/3 – 5/27          → "Month to Date · 5/3 – 5/27"
+     MTD, data 5/3 – 5/22 (stale)  → "Month to Date · 5/3 – 5/22"
+     MTD, data 4/1 – 4/30 (no overlap) → "Month to Date · no in-range data"
+     Last 30, data 5/3 – 5/27      → "Last 30 Days · 5/3 – 5/27"
+     Custom 5/10–5/20, data through 5/15 → "5/10 – 5/15"
+
+   The underlying scoring filter is still calendar-driven (MTD =
+   from 1st of month, no upper bound) — only the human-readable label
+   is clamped to the data window. */
+function buildPeriodLabel(opts){
+  opts = opts || {};
+  const fallback = opts.fallback || '\u2014';
+  if(activeDR === 'all' && !drFrom && !drTo) return fallback;
+
+  // Resolve calendar window (what the preset would naturally span).
+  let calFromDate = null, calToDate = null, presetLabel = '';
+  if(activeDR === 'mtd'){
+    const now = new Date();
+    calFromDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    calToDate   = now;
+    presetLabel = 'Month to Date';
+  } else if(activeDR === 'last30'){
+    calFromDate = new Date(Date.now() - 30*864e5);
+    calToDate   = new Date();
+    presetLabel = 'Last 30 Days';
+  } else if(activeDR === 'last7'){
+    calFromDate = new Date(Date.now() - 7*864e5);
+    calToDate   = new Date();
+    presetLabel = 'Last 7 Days';
+  } else if(activeDR === 'custom' && (drFrom || drTo)){
+    if(drFrom) calFromDate = new Date(drFrom + 'T00:00:00');
+    if(drTo)   calToDate   = new Date(drTo   + 'T23:59:59');
+    presetLabel = ''; // custom shows just the dates, no preset prefix
+  } else {
+    return fallback;
+  }
+
+  // Resolve data window (what we actually have on hand).
+  let dataFromDate = null, dataToDate = null;
+  if(opts.dataRange && opts.dataRange.min && opts.dataRange.max){
+    dataFromDate = new Date(opts.dataRange.min + 'T00:00:00');
+    dataToDate   = new Date(opts.dataRange.max + 'T23:59:59');
+  }
+
+  // Intersect: from = max(cal, data); to = min(cal, data).
+  let displayFrom = calFromDate;
+  let displayTo   = calToDate;
+  if(dataFromDate && (!displayFrom || dataFromDate > displayFrom)) displayFrom = dataFromDate;
+  if(dataToDate   && (!displayTo   || dataToDate   < displayTo))   displayTo   = dataToDate;
+
+  // Empty intersection — the data window doesn't overlap the calendar
+  // window. Surface this honestly so the user understands why their
+  // numbers look empty / strange. (E.g. clicked MTD on June 1 but the
+  // most recent upload only has May rows.)
+  if(displayFrom && displayTo && displayFrom > displayTo){
+    return (presetLabel || 'Custom') + ' \u00b7 no in-range data';
+  }
+
+  const fmtMD = d => d ? ((d.getMonth()+1)+'/'+d.getDate()) : '';
+  const fromStr = fmtMD(displayFrom);
+  const toStr   = fmtMD(displayTo);
+
+  if(presetLabel){
+    return presetLabel + ' \u00b7 ' + fromStr + ' \u2013 ' + toStr;
+  }
+  // Custom — show just the dates.
+  return (displayFrom ? fromStr : 'Start') + ' \u2013 ' + (displayTo ? toStr : 'Latest');
+}
+
+/* ══ RAIL ════════════════════════════════════════════════════ */
+function buildRail(){
+  const rail=document.getElementById('store-rail');
+  rail.querySelectorAll('.s-tab:not(.net)').forEach(e=>e.remove());
+  STORES.forEach(s=>{
+    const d=getStoreData(s.id),has=!!d,top=has&&d.reps&&d.reps[0];
+    const el=document.createElement('div');
+    let cls='s-tab';
+    if(s.isAirstream) cls+=' brand';
+    if(has) cls+=' live';
+    if(curStore===s.id) cls+=' active';
+    el.className=cls;
+    el.dataset.sid=s.id;
+    // Airstream tab has no green-dot indicator (we use the platinum ::before pseudo).
+    const dotH=s.isAirstream?'':'<div class="s-dot"></div>';
+    el.innerHTML=dotH+s.name+'<span class="s-score">'+(has&&top?top.composite.toFixed(0):s.st)+'</span>';
+    el.onclick=()=>goStore(s.id);
+    rail.appendChild(el);
+  });
+  document.getElementById('tab-network').className='s-tab net'+(curStore==='network'?' active':'');
+}
+
+/* ══ NAVIGATION ══════════════════════════════════════════════ */
+function goStore(id){curStore=id;curSec='lineup';activeDR='mtd';drFrom='';drTo='';buildRail();buildPage()}
+function goSec(sec){
+  curSec=sec;
+  document.querySelectorAll('.sec-tab').forEach(t=>{
+    t.classList.toggle('active',t.dataset.sec===sec);
+  });
+  buildSec();
+}
+
+/* ══ DATE RANGE ══════════════════════════════════════════════ */
+function setQuickRange(q){activeDR=q;drFrom='';drTo='';buildPage()}
+function applyCustomRange(){
+  const f=document.getElementById('dr-from')?.value;
+  const t=document.getElementById('dr-to')?.value;
+  if(f||t){drFrom=f||'';drTo=t||'';activeDR='custom';}
+  buildPage();
+}
+function clearDateRange(){activeDR='mtd';drFrom='';drTo='';buildPage()}
+function toggleDRPanel(){document.getElementById('dr-panel')?.classList.toggle('dr-open')}
+
+function getEffectiveDateFrom(){
+  if(drFrom) return drFrom;
+  const now=new Date();
+  if(activeDR==='mtd') return now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-01';
+  if(activeDR==='last30'){const d=new Date(now-30*864e5);return d.toISOString().slice(0,10);}
+  if(activeDR==='last7'){const d=new Date(now-7*864e5);return d.toISOString().slice(0,10);}
+  return '';
+}
+function getEffectiveDateTo(){return drTo||''}
+
+function getAvailableDateRange(d){
+  if(d._rawDates&&d._rawDates.length>0){
+    const s=[...d._rawDates].sort();
+    return {min:s[0],max:s[s.length-1]};
+  }
+  return null;
+}
+
+/* ══ PAGE ════════════════════════════════════════════════════ */
+function buildPage(){
+  const pg=document.getElementById('page');
+  if(curStore==='network'){pg.innerHTML=netHTML();return}
+  const s=STORES.find(x=>x.id===curStore);
+  const d=getStoreData(curStore);
+  if(!d){pg.innerHTML=emptyHTML(s);return}
+
+  // v4.3.4: date pickers enable when EITHER an in-session raw CSV
+  // (just uploaded) OR a persisted filter-rows cache exists. The cache
+  // is PII-stripped so it's safe to keep on disk between sessions.
+  const hasRaw=hasRawCSV(curStore) || hasFilterRows(curStore);
+  const dRange=getAvailableDateRange(d);
+  const minAttr=dRange?(' min="'+dRange.min+'"'):'';
+  const maxAttr=dRange?(' max="'+dRange.max+'"'):'';
+
+  let periodDisplay = buildPeriodLabel({ fallback: d.period || '\u2014', dataRange: dRange });
+
+  const filterActive=activeDR!=='all'||drFrom||drTo;
+
+  const presets=['all','mtd','last30','last7'];
+  const pLabels={all:'All Data',mtd:'Month to Date',last30:'Last 30 Days',last7:'Last 7 Days'};
+  const qBtns=presets.map(q=>'<button class="dr-btn'+(activeDR===q?' active':'')+'" onclick="setQuickRange(\''+q+'\')">'+pLabels[q]+'</button>').join('');
+
+  // v4.3.9 — Date inputs are always enabled. Previously they were
+  // disabled when no row source existed for re-scoring; that was
+  // confusing because users couldn't tell why. Now they're clickable
+  // — and if there's no row source, we surface a clear explainer so
+  // the user knows custom dates won't actually re-score until they
+  // re-upload. The buttons (MTD / Last 30 / Last 7) have always been
+  // clickable and that's unchanged.
+  const inpCls='dr-input';
+  const inpDis='';
+
+  // v4.3.7 — split-date primer (shown whenever a filter is active).
+  // v4.3.9 — also surface a more pointed warning if a filter is set
+  // but we have no row source to actually re-score with.
+  const drInfoLine = filterActive
+    ? '<div class="dr-info">\u24d8 Leads filter by Lead Origination Date \u00b7 Deliveries filter by Lead Last Modified Date. Pre-period leads that closed in-window still count as deliveries.</div>'
+    : '';
+  const drNoRowsLine = (filterActive && !hasRaw)
+    ? '<div class="dr-warn">\u26a0 No row cache for this store \u2014 custom dates can\'t re-score until you re-upload. Showing cached All Data numbers. <button class="dr-warn-cta" onclick="openUploadFor(\''+s.id+'\')">Re-upload '+s.name+' \u2192</button></div>'
+    : '';
+
+  const drPanelHTML=
+    '<div class="dr-wrap">'+
+      '<span class="dr-label">Date Range</span>'+
+      qBtns+
+      '<div class="dr-sep"></div>'+
+      '<div class="dr-dates">'+
+        '<input type="date" class="'+inpCls+'" id="dr-from" value="'+drFrom+'"'+minAttr+maxAttr+inpDis+' onchange="applyCustomRange()">'+
+        '<span class="dr-to">\u2013</span>'+
+        '<input type="date" class="'+inpCls+'" id="dr-to" value="'+drTo+'"'+minAttr+maxAttr+inpDis+' onchange="applyCustomRange()">'+
+      '</div>'+
+      (filterActive?'<button class="dr-clear" onclick="clearDateRange()">\u00d7 Clear</button>':'')+
+    '</div>'+drNoRowsLine+drInfoLine;
+
+  const secs=[
+    {id:'lineup',lbl:'&#9918; Lineup'},
+    {id:'scorecard',lbl:'&#128202; Scorecard'},
+    {id:'coaching',lbl:'&#10022; AI Coaching'},
+    {id:'summary',lbl:'&#128203; Summary'},
+    {id:'methodology',lbl:'&#9881; Methodology'}
+  ];
+  const tabsH=secs.map(x=>'<div class="sec-tab'+(curSec===x.id?' active':'')+'" data-sec="'+x.id+'" onclick="goSec(\''+x.id+'\')">'+x.lbl+'</div>').join('');
+
+  pg.innerHTML=
+    '<div class="ctx'+(s.isAirstream?' brand':'')+'">'+
+      '<div class="ctx-l">'+
+        '<div class="ctx-title">'+s.name+' <em>'+(s.isAirstream?'Brand':'Scorecard')+'</em></div>'+
+        '<button class="tag tag-p tag-dr-btn'+(filterActive?' tag-dr-active':'')+'" onclick="toggleDRPanel()" title="'+SPLIT_DATE_TOOLTIP.replace(/"/g,'&quot;')+'">'+
+          '&#128197;&nbsp;'+periodDisplay+'&nbsp;&#9662;'+
+        '</button>'+
+        (s.isAirstream
+          ? '<span class="tag tag-brand">&#9881; Airstream-only across all rooftops</span>'+
+            '<span class="tag tag-f">700 Credit removed</span>'
+          : '<span class="tag tag-f">700 Credit &amp; Airstream removed</span>')+
+        '<span class="tag tag-c">'+d.reps.length+' reps scored</span>'+
+      '</div>'+
+      '<div class="ctx-r">'+
+        '<button class="btn btn-ghost" onclick="openHistory()">&#128197; History</button>'+
+        '<button class="btn btn-gold" onclick="openUploadFor(\''+s.id+'\')">&#8679; Update Data</button>'+
+      '</div>'+
+    '</div>'+
+    '<div id="dr-panel" class="dr-panel'+(filterActive?' dr-open':'')+'">'+
+      drPanelHTML+
+    '</div>'+
+    '<div class="sec-rail">'+tabsH+'</div>'+
+    '<div class="vwrap" id="sec-content"></div>';
+  buildSec();
+}
+
+function buildSec(){
+  const el=document.getElementById('sec-content');
+  if(!el)return;
+  const s=STORES.find(x=>x.id===curStore);
+  const h=getHist(curStore);
+  const prev=h.length>1?h[1]:null;
+
+  // v4.3.4: Apply date filter using whichever raw-data source is
+  // available. Priority:
+  //   (1) In-session raw CSV in _masterCache (just uploaded; full
+  //       fidelity), parsed and recomputed.
+  //   (2) PII-stripped filter-rows cache in localStorage (persists
+  //       across reloads; PII columns are nulled but date columns,
+  //       statuses, rep names, etc. are intact \u2014 everything
+  //       recompute() actually reads).
+  // If neither is available, the date pickers were already disabled
+  // by the hasRaw check upstream and we just render the cached scores.
+  let d=getStoreData(curStore);
+  const filterActive = (activeDR!=='all'||drFrom||drTo);
+  if(d && filterActive){
+    let filtered = null;
+    const rawCSV = getRawCSV(curStore);
+    if(rawCSV){
+      filtered = recomputeFiltered(rawCSV, getEffectiveDateFrom(), getEffectiveDateTo(), curStore);
+    } else {
+      const cache = getFilterRows(curStore);
+      if(cache && cache.rows && cache.H){
+        filtered = recomputeFilteredFromRows(cache.rows, cache.H, getEffectiveDateFrom(), getEffectiveDateTo(), curStore);
+      }
+    }
+    if(filtered && filtered.reps && filtered.reps.length > 0) d = filtered;
+  }
+
+  if(curSec==='lineup')          el.innerHTML=lineupHTML(d,prev);
+  else if(curSec==='scorecard')  el.innerHTML=scorecardHTML(d);
+  else if(curSec==='coaching')   el.innerHTML=coachHTML(d,s);
+  else if(curSec==='summary')    el.innerHTML=summaryHTML(d,s);
+  else if(curSec==='methodology')el.innerHTML=methodHTML();
+}
+
+/* Re-score from pre-parsed PII-stripped rows. Used after a reload when
+   we don't have the raw CSV any more but the sanitized rows cache is
+   in localStorage. */
+function recomputeFilteredFromRows(rows, H, fromStr, toStr, storeId){
+  try{
+    return recompute(rows, H, storeId, fromStr, toStr);
+  }catch(e){ console.error('recomputeFilteredFromRows failed', e); return null; }
+}
+
+function recomputeFiltered(mText,fromStr,toStr,storeId){
+  try{
+    const parsed=parseMasterCSV(mText);
+    if(!parsed)return null;
+    const {rows,H}=parsed;
+    // v4.1 SPLIT-DATE FIX: Date filtering now happens INSIDE recompute()
+    // because leads and deliveries use different date fields:
+    //   • leads counted by Lead Origination Date in-period
+    //   • deliveries counted by Lead Last Modified Date in-period
+    //     (proxy for sale date — VinSolutions does not expose a
+    //      dedicated close-date column)
+    // A lead originated in March that closed in April is an April
+    // delivery — pre-filtering on origination would drop it.
+    // v4.3.3: result no longer carries _masterText. Caller keeps the
+    // raw CSV in the in-memory _masterCache, not on the result object.
+    return recompute(rows,H,storeId,fromStr,toStr);
+  }catch(e){console.error(e);return null}
+}
+
+/* ══ NETWORK ═════════════════════════════════════════════════ */
+
+/* v4.3.6 — Returns date-filtered store data when the current date
+   range is active, or the cached all-data record when no filter is
+   set or no row source is available. Used by netHTML so leadership
+   can scope the Network Overview KPIs to a specific period (MTD,
+   Last 30, Last 7, or a custom range) just like the per-store tabs.
+
+   Falls back to cached scores when:
+     - No date filter is active (presets='all' and no custom range), OR
+     - Neither an in-session raw CSV nor a persisted row cache exists
+       for this store (e.g. uploaded before v4.3.4 and never re-uploaded).
+
+   Returns { data, filtered }. `filtered === true` only when this
+   call actually produced filtered numbers from a row source. Used
+   by the caller to count how many rooftops were re-filterable. */
+function getRecomputedStoreData(storeId){
+  const cached = getStoreData(storeId);
+  if(!cached) return { data: null, filtered: false };
+
+  const filterActive = (activeDR !== 'all') || drFrom || drTo;
+  if(!filterActive) return { data: cached, filtered: false };
+
+  // Try in-session raw CSV first (highest fidelity).
+  const rawCSV = getRawCSV(storeId);
+  if(rawCSV){
+    const fresh = recomputeFiltered(rawCSV, getEffectiveDateFrom(), getEffectiveDateTo(), storeId);
+    if(fresh && fresh.reps) return { data: fresh, filtered: true };
+  }
+  // Fall back to persisted PII-stripped row cache.
+  const cache = getFilterRows(storeId);
+  if(cache && cache.rows && cache.H){
+    const fresh = recomputeFilteredFromRows(cache.rows, cache.H, getEffectiveDateFrom(), getEffectiveDateTo(), storeId);
+    if(fresh && fresh.reps) return { data: fresh, filtered: true };
+  }
+  // No row source — return cached scores. Caller will surface that
+  // this store wasn't actually re-filtered.
+  return { data: cached, filtered: false };
+}
+
+/* Union of every rooftop's _rawDates, used to bound the Network
+   date-picker min/max attributes. Excludes Airstream because the
+   Network tab is rooftop-only. */
+function getNetworkDateRange(){
+  let min = null, max = null;
+  const rooftops = STORES.filter(s => !s.isAirstream);
+  for(const s of rooftops){
+    const d = getStoreData(s.id);
+    if(!d || !d._rawDates || !d._rawDates.length) continue;
+    const sorted = [...d._rawDates].sort();
+    const lo = sorted[0], hi = sorted[sorted.length - 1];
+    if(!min || lo < min) min = lo;
+    if(!max || hi > max) max = hi;
+  }
+  return min && max ? { min, max } : null;
+}
+
+function netHTML(){
+  // Rooftop KPIs stay rooftop-only — Airstream is a parallel brand view.
+  const rooftops = STORES.filter(s=>!s.isAirstream);
+  const brandRow = STORES.find(s=>s.isAirstream);
+
+  // v4.3.6: Apply the active date range to each rooftop's data
+  // independently, then aggregate. Each store re-scores against
+  // whichever row source it has available (in-session raw CSV or
+  // persisted PII-stripped row cache). Stores without a row source
+  // fall back to their cached all-data scores; we count those so
+  // we can surface "X of N rooftops re-filterable" honestly.
+  const rooftopRecords = rooftops.map(s => {
+    const r = getRecomputedStoreData(s.id);
+    return { store: s, data: r.data, filtered: r.filtered };
+  });
+  // "Live" = has any data uploaded, regardless of whether reps cleared
+  // the 10-lead floor in the current filter window. A store with 0
+  // in-period scoreable reps is still "live" — it just contributes 0
+  // to the aggregate KPIs for this window.
+  const live = rooftopRecords.filter(r => !!getStoreData(r.store.id));
+  // For the aggregate KPI math we use whichever data the date filter
+  // produced (which is the same as cached data when no filter is set).
+  const aggregateRecords = live.filter(r => !!r.data && r.data.totals);
+  const filterActive = (activeDR !== 'all') || drFrom || drTo;
+  const filterableCount = aggregateRecords.filter(r => r.filtered).length;
+
+  const tL = aggregateRecords.reduce((a, r) => a + (r.data.totals.total_leads || 0), 0);
+  const tD = aggregateRecords.reduce((a, r) => a + (r.data.totals.delivered || 0), 0);
+  const aC = aggregateRecords.length ? aggregateRecords.reduce((a, r) => a + (r.data.totals.avg_conv || 0), 0) / aggregateRecords.length : 0;
+  const tV = aggregateRecords.reduce((a, r) => a + (r.data.totals.total_visits || 0), 0);
+
+  const renderCard = (s, dataOverride) => {
+    // For rooftops, prefer the date-filtered record from rooftopRecords.
+    // For the brand row (Airstream), we always show its own cached
+    // numbers — the Network date picker doesn't scope Airstream
+    // because that's a parallel brand view with its own filter logic.
+    let d;
+    if(dataOverride !== undefined){
+      d = dataOverride;
+    } else {
+      const match = rooftopRecords.find(r => r.store.id === s.id);
+      d = match ? match.data : getStoreData(s.id);
+    }
+    const has = !!d && d.reps && d.reps.length;
+    const top = has && d.reps[0];
+    const tot = has ? d.totals : null;
+    const cls = 'nc' + (s.isAirstream ? ' brand' : '') + (has ? ' live' : '');
+    // Period label: if a Network filter is active and this rooftop
+    // was actually re-filtered, show the filter label instead of the
+    // upload-date label so the user knows what they're looking at.
+    let periodLabel = has ? (d.period || '\u2014') : '';
+    const wasFiltered = rooftopRecords.find(r => r.store.id === s.id)?.filtered;
+    if(has && filterActive && wasFiltered){
+      periodLabel = buildPeriodLabel({fallback: d.period || '\u2014', dataRange: getAvailableDateRange(d)});
+    } else if(has && filterActive && !wasFiltered && !s.isAirstream){
+      periodLabel = (d.period || 'Latest') + ' \u00b7 not re-filterable';
+    }
+    return '<div class="'+cls+'" onclick="goStore(\''+s.id+'\')">'+
+      '<div class="nc-hd"><div><div class="nc-name">'+s.name+'</div><div class="nc-state">'+s.st+'</div></div>'+
+      '<div><div class="nc-sv">'+(has&&top?top.composite.toFixed(1):'\u2014')+'</div><div class="nc-sl">Top Score</div></div></div>'+
+      (has?
+        '<div class="nc-stats">'+
+          '<div><div class="ncs-v">'+(tot.total_leads||0).toLocaleString()+'</div><div class="ncs-l">Leads</div></div>'+
+          '<div><div class="ncs-v">'+(tot.delivered||0)+'</div><div class="ncs-l">Delivered</div></div>'+
+          '<div><div class="ncs-v '+pCls(tot.avg_conv||0)+'">'+pct(tot.avg_conv||0)+'</div><div class="ncs-l">Conv%</div></div>'+
+        '</div>'+
+        '<div style="margin-top:7px;font-size:10px;color:var(--t3)">'+periodLabel+' \u00b7 '+d.reps.length+' reps</div>'
+      :
+        '<div class="nc-empty">'+(s.isAirstream?'No Airstream master uploaded yet':'No data uploaded yet')+'</div>'+
+        '<button class="nc-cta" onclick="event.stopPropagation();openUploadFor(\''+s.id+'\')">&#8679; Upload '+s.name+' Data</button>'
+      )+'</div>';
+  };
+  const cards = rooftops.map(s => renderCard(s)).join('');
+  const brandCardHTML = brandRow
+    ? '<div class="brand-section">'+
+        '<div class="slbl">&#9881; Brand Rollup &mdash; <em>Airstream across all rooftops</em></div>'+
+        '<div class="brand-grid">'+renderCard(brandRow, getStoreData(brandRow.id))+'</div>'+
+      '</div>'
+    : '';
+
+  /* v4.3.6 — Date picker UI for the Network tab. Mirrors the per-
+     store picker (presets + custom + clear) so leadership has the
+     same controls across every view. Enabled when AT LEAST ONE
+     rooftop has a row source available. If zero rooftops can be
+     re-filtered, presets stay clickable (they just won't actually
+     do anything useful) but the date inputs disable, matching the
+     per-store behavior. */
+  const netRange = getNetworkDateRange();
+  const periodDisplay = filterActive ? buildPeriodLabel({fallback:'\u2014', dataRange: netRange}) : 'All Data';
+  const presets = ['all','mtd','last30','last7'];
+  const pLabels = {all:'All Data',mtd:'Month to Date',last30:'Last 30 Days',last7:'Last 7 Days'};
+  const qBtns = presets.map(q =>
+    '<button class="dr-btn'+(activeDR===q?' active':'')+'" onclick="setQuickRange(\''+q+'\')">'+pLabels[q]+'</button>'
+  ).join('');
+  const minAttr = netRange ? (' min="'+netRange.min+'"') : '';
+  const maxAttr = netRange ? (' max="'+netRange.max+'"') : '';
+  const anyFilterable = rooftopRecords.some(r => !!getRawCSV(r.store.id) || hasFilterRows(r.store.id));
+  // v4.3.9 — date inputs always enabled (see per-store comment).
+  const inpCls = 'dr-input';
+  const inpDis = '';
+  // v4.3.7 — split-date explainer surfaced inside the panel as well.
+  const drInfoLine = filterActive
+    ? '<div class="dr-info">\u24d8 Leads filter by Lead Origination Date \u00b7 Deliveries filter by Lead Last Modified Date. Pre-period leads that closed in-window still count as deliveries.</div>'
+    : '';
+  // v4.3.9 — if a filter is active but zero rooftops have row sources,
+  // surface that clearly. Different copy from per-store because the
+  // remedy is "re-upload at least one rooftop" rather than naming a
+  // specific one.
+  const drNoRowsLine = (filterActive && !anyFilterable)
+    ? '<div class="dr-warn">\u26a0 No rooftop has a row cache \u2014 custom dates can\'t re-score until at least one CSV is re-uploaded. Showing cached All Data numbers. <button class="dr-warn-cta" onclick="openUpload()">Upload a CSV \u2192</button></div>'
+    : '';
+  const drPanelHTML =
+    '<div class="dr-wrap">'+
+      '<span class="dr-label">Date Range</span>'+
+      qBtns+
+      '<div class="dr-sep"></div>'+
+      '<div class="dr-dates">'+
+        '<input type="date" class="'+inpCls+'" id="dr-from" value="'+drFrom+'"'+minAttr+maxAttr+inpDis+' onchange="applyCustomRange()">'+
+        '<span class="dr-to">\u2013</span>'+
+        '<input type="date" class="'+inpCls+'" id="dr-to" value="'+drTo+'"'+minAttr+maxAttr+inpDis+' onchange="applyCustomRange()">'+
+      '</div>'+
+      (filterActive ? '<button class="dr-clear" onclick="clearDateRange()">\u00d7 Clear</button>' : '')+
+    '</div>'+drNoRowsLine+drInfoLine;
+
+  // Surface unfilterable rooftops honestly — when a filter is active
+  // but some stores fall back to all-data, the aggregate KPIs are
+  // mixing periods. Tell leadership which stores need re-uploading.
+  const unfilterableNames = filterActive
+    ? rooftopRecords
+        .filter(r => r.data && r.data.reps && r.data.reps.length && !r.filtered)
+        .map(r => r.store.name)
+    : [];
+  const unfilterableNote = unfilterableNames.length
+    ? '<span class="tag tag-n">'+unfilterableNames.length+' rooftop'+(unfilterableNames.length===1?'':'s')+' showing all-data: '+unfilterableNames.join(', ')+'. Re-upload to enable date filter.</span>'
+    : '';
+
+  // v4.3.7 — Split-date footnote under the KPI strip. When a filter
+  // is active, surface how many of the displayed deliveries came from
+  // leads that originated BEFORE the filter window. This is what was
+  // causing the "leads dropped but deliveries didn't" confusion.
+  const priorDel = aggregateRecords.reduce((a,r) => a + (r.data.totals.prior_period_deliveries || 0), 0);
+  const kpiSplitNote = (filterActive && priorDel > 0)
+    ? '<div class="split-note">'+
+        '<span class="sn-ico">\u24d8</span>'+
+        '<span><strong>'+priorDel+'</strong> of <strong>'+tD+'</strong> deliveries came from leads that originated <strong>before</strong> the current window. '+
+        'They count as deliveries because their sale date (Lead Last Modified Date) falls inside the window, even though their origination date does not.</span>'+
+      '</div>'
+    : '';
+
+  return '<div class="ctx"><div class="ctx-l"><div class="ctx-title">Network <em>Overview</em></div>'+
+    '<button class="tag tag-p tag-dr-btn'+(filterActive?' tag-dr-active':'')+'" onclick="toggleDRPanel()" title="'+SPLIT_DATE_TOOLTIP.replace(/"/g,'&quot;')+'">'+
+      '&#128197;&nbsp;'+periodDisplay+'&nbsp;&#9662;'+
+    '</button>'+
+    '<span class="tag tag-c">'+live.length+' of '+rooftops.length+' rooftops live</span>'+
+    '<span class="tag tag-f">700 Credit &amp; Airstream removed</span>'+
+    (brandRow&&getStoreData(brandRow.id)?'<span class="tag tag-brand">Airstream brand tab live</span>':'')+
+    unfilterableNote+
+    '</div><div class="ctx-r">'+
+    '<button class="btn btn-ghost" onclick="openHistory()">&#128197; History</button>'+
+    '<button class="btn btn-gold" onclick="openUpload()">&#8679; Upload Store Data</button>'+
+    '</div></div>'+
+    '<div id="dr-panel" class="dr-panel'+(filterActive?' dr-open':'')+'">'+
+      drPanelHTML+
+    '</div>'+
+    '<div class="vwrap">'+
+      '<div class="kpi5">'+
+        '<div class="kpi"><div class="kpi-v">'+live.length+'</div><div class="kpi-l">Active Rooftops</div><div class="kpi-s">of '+rooftops.length+' total</div></div>'+
+        '<div class="kpi"><div class="kpi-v">'+tL.toLocaleString()+'</div><div class="kpi-l">Total Leads</div><div class="kpi-s">'+(filterActive?periodDisplay:'Rooftops (excl. Airstream)')+'</div></div>'+
+        '<div class="kpi"><div class="kpi-v">'+tD+'</div><div class="kpi-l">Delivered</div><div class="kpi-s">'+(filterActive&&priorDel>0?priorDel+' from pre-period leads':'Unique customers')+'</div></div>'+
+        '<div class="kpi"><div class="kpi-v g">'+(live.length?pct(aC):'\u2014')+'</div><div class="kpi-l">Avg Conversion</div><div class="kpi-s">Across live rooftops</div></div>'+
+        '<div class="kpi"><div class="kpi-v m">'+tV.toLocaleString()+'</div><div class="kpi-l">Floor Visits</div><div class="kpi-s">Logged showroom visits</div></div>'+
+      '</div>'+
+      kpiSplitNote+
+      '<div class="slbl">All Rooftops</div>'+
+      '<div class="net-grid">'+cards+'</div>'+
+      brandCardHTML+
+    '</div>';
+}
+
+/* ══ EMPTY ═══════════════════════════════════════════════════ */
+function emptyHTML(s){
+  const isB=!!s.isAirstream;
+  const filtNote=isB
+    ? 'Only Airstream-identified leads are kept (matched by Lead Source, Source Group, or Make). Rows can originate from any of the 9 rooftops or the Airstream of GARV rooftop.'
+    : '700 Credit and Airstream filtered automatically';
+  const blurb=isB
+    ? 'Upload a master lead export filtered to Airstream Make (or pull the full network export \u2014 we\u2019ll keep only Airstream rows). Reps are scored exactly like a rooftop tab: conversion, volume, speed, contact, floor. Composite scoring and lineup positions stay identical.'
+    : 'Upload a VinSolutions master lead export to generate scores, baseball cards, AI coaching, and week-over-week trends for this location.';
+  return '<div class="ctx'+(isB?' brand':'')+'"><div class="ctx-l"><div class="ctx-title">'+s.name+(isB?' <em>Brand</em>':'')+'</div><span class="tag tag-n">No data uploaded</span>'+(isB?'<span class="tag tag-brand">Cross-rooftop view</span>':'')+'</div></div>'+
+    '<div class="vwrap"><div class="empty">'+
+    '<div class="empty-ico">'+(isB?'&#9881;':'&#128194;')+'</div>'+
+    '<div class="empty-t">'+s.name+' Ready</div>'+
+    '<div class="empty-b">'+blurb+'</div>'+
+    '<div class="empty-steps">'+
+      '<div class="estep"><div class="estep-n">1</div><div class="estep-t">Export from VinSolutions</div><div class="estep-d">Master lead report containing leads + showroom visits</div></div>'+
+      '<div class="estep"><div class="estep-n">2</div><div class="estep-t">Drop CSV Here</div><div class="estep-d">'+filtNote+'</div></div>'+
+      '<div class="estep"><div class="estep-n">3</div><div class="estep-t">Scores Appear</div><div class="estep-d">Full lineup, scorecard, AI coaching, and trend tracking instantly</div></div>'+
+    '</div>'+
+    '<div class="empty-btns">'+
+      '<button class="btn btn-gold" onclick="openUploadFor(\''+s.id+'\')">&#8679; Upload '+s.name+' Data</button>'+
+      '<button class="btn btn-ghost" onclick="goStore(\'network\')">&#8592; Network Overview</button>'+
+    '</div></div></div>';
+}
+
+/* ══ LINEUP ══════════════════════════════════════════════════ */
+function lineupHTML(d,prev){
+  const reps=d.reps||[],pR=prev?(prev.reps||[]):[];
+  const s =reps.filter(r=>r.lineup==='Starter');
+  const l =reps.filter(r=>r.lineup==='Lineup');
+  const dh=reps.filter(r=>r.lineup==='DH');
+  const b =reps.filter(r=>r.lineup==='Bench');
+  // v4.3.4: Airstream-only per-store breakdown band.
+  // Shows where the brand's leads and sales actually came from across
+  // the network so leadership can see at a glance which rooftops carry
+  // Airstream volume vs which need attention.
+  const storeBand = (d.byStore && d.byStore.length)
+    ? '<div class="slbl">&#127960; By Rooftop \u2014 Airstream pipeline across all stores</div>'+
+      '<div class="store-grid">'+
+        d.byStore.map(b=>storeBox(b)).join('')+
+      '</div>'
+    : '';
+  return storeBand +
+    '<div class="slbl">&#11088; Starters \u2014 Positions 1\u20134</div>'+
+    '<div class="cgrid">'+s.map(r=>bcard(r,pR)).join('')+'</div>'+
+    (l.length?'<div class="slbl">&#9654; The Lineup \u2014 Positions 5\u20139</div>'+
+    '<div class="cgrid">'+l.map(r=>bcard(r,pR)).join('')+'</div>':'')+
+    (dh.length?'<div class="slbl">&#9670; Designated Hitter \u2014 Standout in one area, gap in another</div>'+
+    '<div class="cgrid">'+dh.map(r=>bcard(r,pR)).join('')+'</div>':'')+
+    (b.length?'<div class="slbl">&#9724; The Bench</div>'+
+    '<div class="cgrid">'+b.map(r=>bcard(r,pR)).join('')+'</div>':'');
+}
+
+/* Per-store rollup tile shown on the Airstream tab.
+   Layout: dealer name + lead count + delivered + conversion %.
+   Uses platinum/silver styling consistent with the rest of the
+   Airstream tab so it visually ties to the brand tab. */
+function storeBox(b){
+  const cv = b.valid_leads ? b.delivered / b.valid_leads : 0;
+  const cvCls = pCls(cv);
+  return '<div class="sbox">'+
+    '<div class="sbox-name">'+b.dealer+'</div>'+
+    '<div class="sbox-stats">'+
+      '<div class="sb"><div class="sb-v">'+b.valid_leads+'</div><div class="sb-l">Leads</div></div>'+
+      '<div class="sb"><div class="sb-v">'+b.delivered+'</div><div class="sb-l">Delivered</div></div>'+
+      '<div class="sb"><div class="sb-v '+cvCls+'">'+pct(cv)+'</div><div class="sb-l">Conv %</div></div>'+
+    '</div>'+
+    '<div class="sbox-foot">'+b.rep_count+' rep'+(b.rep_count===1?'':'s')+' active</div>'+
+  '</div>';
+}
+
+function bcard(r,pR){
+  const cl=r.lineup==='Starter'?'starter':r.lineup==='Lineup'?'lineup':r.lineup==='DH'?'dh':'bench';
+  const bc=r.lineup==='Starter'?'lb-s':r.lineup==='Lineup'?'lb-l':r.lineup==='DH'?'lb-dh':'lb-b';
+  const lbl=r.lineup==='Starter'?'&#11088; Starter':r.lineup==='Lineup'?'&#9654; Lineup':r.lineup==='DH'?'&#9670; DH':'&#9724; Bench';
+  const bars=[
+    {n:'Conversion',p:r.conv_pts/30,   pts:r.conv_pts.toFixed(1)+'/30', c:'bf-c'},
+    {n:'Volume',    p:r.vol_pts/20,    pts:r.vol_pts.toFixed(1)+'/20',  c:'bf-v'},
+    {n:'Speed',     p:r.speed_pts/15,  pts:r.speed_pts+'/15',           c:'bf-s'},
+    {n:'Contact',   p:r.contact_pts/15,pts:r.contact_pts.toFixed(1)+'/15',c:'bf-n'},
+    {n:'Floor',     p:r.floor_pts/20,  pts:r.floor_pts.toFixed(1)+'/20', c:'bf-f'},
+  ];
+  const barsH=bars.map(b=>'<div class="brow"><div class="bn">'+b.n+'</div><div class="bt"><div class="bf '+b.c+'" style="width:'+Math.round(b.p*100)+'%"></div></div><div class="bp">'+b.pts+'</div></div>').join('');
+  let trendH='';
+  if(pR&&pR.length){
+    const pr=pR.find(x=>x.name===r.name);
+    if(pr){
+      const d=r.composite-pr.composite;
+      const cls=d>.4?'up':d<-.4?'dn':'eq';
+      const ico=d>.4?'&#9650;':d<-.4?'&#9660;':'\u2014';
+      trendH='<div class="trend '+cls+'">'+ico+' '+(d>0?'+':'')+d.toFixed(1)+' pts vs last upload</div>';
+    }
+  }
+  const noteH=r.bench_note?'<div class="bc-note">&#9888; '+r.bench_note+'</div>':'';
+  // v4.3.4: Airstream tab \u2014 if this rep has a per-dealer breakdown
+  // attached, render a small expandable section under the score card
+  // so leadership can see which rooftops contributed to this rep's
+  // Airstream numbers. Cross-rooftop reps (e.g. handling brand leads
+  // at multiple stores) show multiple rows.
+  let dealerH = '';
+  if(r.byDealer && r.byDealer.length){
+    const rows = r.byDealer.map(db=>{
+      const cv = db.valid_leads ? db.delivered / db.valid_leads : 0;
+      return '<div class="dlr-row">'+
+        '<div class="dlr-name">'+db.dealer+'</div>'+
+        '<div class="dlr-stats">'+
+          '<span class="dlr-stat">'+db.valid_leads+' leads</span>'+
+          '<span class="dlr-stat">'+db.delivered+' del</span>'+
+          '<span class="dlr-stat '+pCls(cv)+'">'+pct(cv)+'</span>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+    const summary = r.byDealer.length === 1
+      ? '<span class="dlr-summary">All from '+r.byDealer[0].dealer+'</span>'
+      : '<span class="dlr-summary">'+r.byDealer.length+' rooftops</span>';
+    dealerH = '<details class="dlr"><summary class="dlr-toggle">&#127960; By rooftop &nbsp;'+summary+'</summary><div class="dlr-body">'+rows+'</div></details>';
+  }
+  return '<div class="bc '+cl+'">'+
+    '<div class="bc-top">'+
+      '<div class="bc-pos">'+r.pos+'</div>'+
+      '<div class="bc-id"><div class="bc-name">'+r.name+'</div><div class="bc-team">'+(r.group||'Sales')+'</div></div>'+
+      '<div class="bc-sc"><div class="bc-score">'+r.composite.toFixed(1)+'</div><div class="bc-max">/ 100</div></div>'+
+    '</div>'+
+    '<div class="bc-meta"><span class="lbadge '+bc+'">'+lbl+'</span>'+trendH+'</div>'+
+    '<div class="bc-bars">'+barsH+'</div>'+
+    '<div class="bc-stats">'+
+      '<div class="bs"><div class="bs-v">'+pct(r.conv_rate)+'</div><div class="bs-l">Conv%</div></div>'+
+      '<div class="bs"><div class="bs-v">'+r.delivered+'</div><div class="bs-l">Delivered</div></div>'+
+      '<div class="bs"><div class="bs-v">'+pill(r.speed_tier)+(r.med_adj!==null?'<span class="bs-sub">'+fmtT(r.med_adj)+'</span>':'')+'</div><div class="bs-l">Speed</div></div>'+
+      '<div class="bs"><div class="bs-v">'+pct(r.contact_disc)+'</div><div class="bs-l">Contact</div></div>'+
+      '<div class="bs"><div class="bs-v">'+r.visits+'</div><div class="bs-l">Visits</div></div>'+
+      '<div class="bs"><div class="bs-v">'+r.write_ups+'<span style="font-size:9px;color:var(--t3)"> ('+pct(r.writeup_rate)+')</span></div><div class="bs-l">Write-Ups</div></div>'+
+    '</div>'+noteH+dealerH+
+  '</div>';
+}
+
+/* ══ SCORECARD ═══════════════════════════════════════════════ */
+function scorecardHTML(d){
+  const rows=(d.reps||[]).map(r=>{
+    return '<tr class="'+(r.lineup==='Starter'?'sr':'')+'">'+
+      '<td class="c"><span class="pnum '+(r.lineup==='Starter'?'pg':'')+'">'+r.pos+'</span></td>'+
+      '<td class="nm">'+r.name+'</td>'+
+      '<td style="color:var(--t3);font-size:11px">'+(r.group||'Sales')+'</td>'+
+      '<td class="c"><span class="lbadge '+(r.lineup==='Starter'?'lb-s':r.lineup==='Lineup'?'lb-l':r.lineup==='DH'?'lb-dh':'lb-b')+'" style="font-size:9px">'+r.lineup+'</span></td>'+
+      '<td class="r"><span class="scnum '+scCls(r.composite)+'">'+r.composite.toFixed(1)+'</span></td>'+
+      '<td class="r" style="color:var(--t3)">'+r.valid_leads+'</td>'+
+      '<td class="r">'+r.delivered+'</td>'+
+      '<td class="r '+pCls(r.conv_rate)+'">'+pct(r.conv_rate)+'</td>'+
+      '<td class="c">'+pill(r.speed_tier)+'<br><span style="font-size:9px;color:var(--t3)">'+fmtT(r.med_adj)+' &middot; '+r.internet_leads+' internet</span></td>'+
+      '<td class="r" style="color:var(--t1)">'+pct(r.contact_rate)+'</td>'+
+      '<td class="r" style="color:var(--t1)">'+pct(r.multi_ch_rate)+'</td>'+
+      '<td class="r">'+r.visits+'</td>'+
+      '<td class="r">'+r.write_ups+' <span style="font-size:9px;color:var(--t3)">('+pct(r.writeup_rate)+')</span></td>'+
+    '</tr>';
+  }).join('');
+  return '<div class="tshell"><div class="tscroll"><table>'+
+    '<thead><tr>'+
+    '<th class="c">#</th><th>Rep</th><th>Team</th><th class="c">Spot</th>'+
+    '<th class="r">Score</th><th class="r">Leads</th><th class="r">Del.</th>'+
+    '<th class="r">Conv%</th>'+
+    '<th class="c">Speed</th><th class="r">Contact%</th><th class="r">Multi%</th>'+
+    '<th class="r">Visits</th><th class="r">Write-Ups</th>'+
+    '</tr></thead><tbody>'+rows+'</tbody></table></div></div>'+
+    '<p style="font-size:10px;color:var(--t3);line-height:1.8">'+
+    '&#9888; Speed tier is calculated on <strong>internet leads only</strong>, using the VinSolutions Adjusted Response Time (overnight leads already accounted for). Walk-in and phone leads are not penalized \u2014 response time on those is zero by definition.<br>'+
+    'Revenue and gross are not displayed or scored. VinSolutions gross is pre-adjustment; IDS is the authoritative source for margin.</p>';
+}
+
+/* ══ COACHING ════════════════════════════════════════════════ */
+function coachHTML(d,s){
+  const reps=d.reps||[],top=reps[0];
+  if(!top) return '<div class="empty"><div class="empty-ico">&#10022;</div><div class="empty-t">No Data</div><div class="empty-b">Upload a master lead report to generate coaching cards.</div></div>';
+  const lowConv=reps.filter(r=>r.conv_rate<.09).sort((a,b)=>a.conv_rate-b.conv_rate);
+  const lowCont=reps.filter(r=>r.contact_disc<.82).sort((a,b)=>a.contact_disc-b.contact_disc);
+  const lowFlr =reps.filter(r=>r.writeup_rate<.35&&r.visits>=3).sort((a,b)=>a.writeup_rate-b.writeup_rate);
+  const slowInet=reps.filter(r=>r.internet_leads>=5&&r.med_adj!==null&&r.med_adj>=60).sort((a,b)=>(b.med_adj||0)-(a.med_adj||0));
+  const rtH=reps.filter(r=>r.internet_leads>=3).slice(0,8).map(r=>{
+    const mt=r.med_adj||0;
+    const w=Math.min(100,Math.round((mt/900)*100));
+    const c=mt<15?'var(--grn)':mt<60?'var(--gold)':mt<240?'var(--blu)':'var(--red)';
+    return '<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">'+
+      '<div style="color:var(--t1);width:112px;flex-shrink:0;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+r.name+'</div>'+
+      '<div style="flex:1;height:3px;background:var(--rule);border-radius:2px;overflow:hidden"><div style="height:100%;width:'+w+'%;background:'+c+';border-radius:2px"></div></div>'+
+      '<div style="font-family:var(--mono);font-size:10px;color:var(--t3);width:60px;text-align:right">'+fmtT(mt)+' &middot; '+r.internet_leads+'</div></div>';
+  }).join('');
+  const cards=[
+    {ico:'&#127919;',t:'Conversion Coaching',
+     b:'<strong>#1: '+top.name+' at '+pct(top.conv_rate)+'</strong> \u2014 '+top.delivered+' deliveries on '+top.valid_leads+' leads. That is the benchmark.'+(lowConv.length?'<br><br><strong>Below 9%:</strong> '+lowConv.map(r=>r.name+' ('+pct(r.conv_rate)+')').join(', ')+'.<br><br>':'<br><br>')+'Conversion gaps trace to qualification gaps. Pull one lost lead per rep this week and walk the contact log together.',
+     src:'Master lead report \u00b7 Sales Rep deliveries'},
+    {ico:'&#9201;',t:'Speed to Lead \u2014 Internet Only',
+     b:(slowInet.length?'<strong>Slowest internet responders:</strong> '+slowInet.slice(0,5).map(r=>r.name+' ('+fmtT(r.med_adj)+')').join(', ')+'.<br><br>':'All reps responding under an hour on internet leads.<br><br>')+(rtH?rtH+'<br>':'')+'Under 15 minutes is the standard. Walk-in/phone are zero by definition and not scored.',
+     src:'Adjusted Response Time \u00b7 Internet leads only'},
+    {ico:'&#128203;',t:'Write-Up Discipline',
+     b:(lowFlr.length?'<strong>Low write-up rate (3+ visits):</strong> '+lowFlr.slice(0,6).map(r=>r.name+' \u2014 '+r.write_ups+'/'+r.visits+' ('+pct(r.writeup_rate)+')').join(' &middot; ')+'.<br><br>':'Solid write-up discipline across the floor.<br><br>')+'A write-up is not a commitment \u2014 it is how you find out where the deal lives. Every serious floor customer gets a write-up. No exceptions.',
+     src:'Visit Result + Write Up flags from master report'},
+    {ico:'&#128223;',t:'Contact Discipline',
+     b:(lowCont.length?'<strong>Below 82% combined:</strong> '+lowCont.slice(0,5).map(r=>r.name+' ('+pct(r.contact_disc)+')').join(' &middot; ')+'.<br><br>':'Contact discipline is strong across the floor.<br><br>')+'Rule: every lead gets phone + email + text. Multi-channel earns roughly 3\u00d7 the response rate. Silence is not a follow-up strategy.',
+     src:'Contact attempt columns from master report'},
+  ];
+  const cH=cards.map(c=>'<div class="aic"><div class="aic-ico">'+c.ico+'</div><div class="aic-t">'+c.t+'</div><div class="aic-b">'+c.b+'</div><div class="aic-src">\u25a0 '+c.src+'</div></div>').join('');
+  return '<div class="ai-prompt"><input id="il-inp" placeholder="Ask about a rep, a trend, or what to focus on this week\u2026" onkeydown="if(event.key===\'Enter\')runInline()"><button class="btn btn-ai" onclick="runInline()">&#10022; Ask</button></div>'+
+    '<div class="ai-think" id="il-think"><div class="spin"></div> Analyzing team data\u2026</div>'+
+    '<div class="ai-res" id="il-res"></div>'+
+    '<div class="slbl">Data-Driven Coaching Cards</div>'+
+    '<div class="aicg">'+cH+'</div>';
+}
+
+/* ══ SUMMARY ═════════════════════════════════════════════════ */
+function summaryHTML(d,s){
+  const reps=d.reps||[],top=reps[0],tot=d.totals||{};
+  const avgConv=tot.avg_conv||0;
+  const totLeads=tot.total_leads||0;
+  const totDel=tot.delivered||0;
+  const totVis=tot.total_visits||0;
+  const totWU=tot.total_writeups||0;
+  // v4.3.7 — split-date surfacing on the Delivered KPI sublabel
+  const priorDel = tot.prior_period_deliveries || 0;
+  const filterActive = (activeDR!=='all'||drFrom||drTo);
+  const delSub = (filterActive && priorDel > 0)
+    ? priorDel+' from pre-period leads'
+    : 'Unique customers';
+  return '<div class="kpi-r5">'+
+    '<div class="kpi"><div class="kpi-v">'+reps.length+'</div><div class="kpi-l">Reps Scored</div><div class="kpi-s">Of '+(tot.total_sales_people||reps.length)+' sales people</div></div>'+
+    '<div class="kpi"><div class="kpi-v">'+totLeads.toLocaleString()+'</div><div class="kpi-l">Valid Leads</div><div class="kpi-s">After filters</div></div>'+
+    '<div class="kpi"><div class="kpi-v g">'+totDel+'</div><div class="kpi-l">Delivered</div><div class="kpi-s">'+delSub+'</div></div>'+
+    '<div class="kpi"><div class="kpi-v">'+pct(avgConv)+'</div><div class="kpi-l">Avg Conversion</div><div class="kpi-s">Mean across reps</div></div>'+
+    '<div class="kpi"><div class="kpi-v m">'+totVis+'</div><div class="kpi-l">Floor Visits</div><div class="kpi-s">'+totWU+' write-ups</div></div>'+
+  '</div>'+
+  '<div class="two">'+
+    '<div class="panel"><div class="panel-t">&#11088; <em>Leadoff</em> \u2014 '+(top?top.name:'\u2014')+'</div>'+
+      '<div class="cal grn"><div class="cal-h">Period Benchmark</div>'+(top?top.name+' leads with <strong>'+pct(top.conv_rate)+'</strong> conversion and <strong>'+top.delivered+' deliveries</strong> on '+top.valid_leads+' valid leads. Contact at '+pct(top.contact_disc)+'. This is the process to replicate.':'\u2014')+'</div>'+
+    '</div>'+
+    '<div class="panel"><div class="panel-t">&#9201; <em>Speed to Lead</em> \u2014 Internet Leads Only</div>'+
+      '<div class="cal red"><div class="cal-h">In-Hours Response Window</div>Speed is scored on internet leads using the VinSolutions Adjusted Response Time. Walk-in and phone leads are not penalized \u2014 response time on those is zero by definition. Under 15 minutes on internet leads is the standard.</div>'+
+    '</div>'+
+    '<div class="panel full"><div class="panel-t">&#127919; <em>Three Priorities</em> This Week</div>'+
+      '<ul class="plist">'+
+        '<li><div class="pn">1</div><div><strong style="color:var(--t0)">Every internet lead gets a response within 15 minutes during business hours.</strong> Notifications on, phone in hand. Customers are shopping multiple dealers simultaneously.</div></li>'+
+        '<li><div class="pn">2</div><div><strong style="color:var(--t0)">Write-up on every serious floor customer.</strong> Not in VinSolutions = did not happen. A write-up is how you find where the deal lives.</div></li>'+
+        '<li><div class="pn">3</div><div><strong style="color:var(--t0)">Three-channel contact on every internet lead.</strong> Phone + email + text. Multi-channel earns roughly 3\u00d7 the response rate. Silence is not a follow-up strategy.</div></li>'+
+      '</ul>'+
+    '</div>'+
+  '</div>';
+}
+
+/* ══ METHODOLOGY ═════════════════════════════════════════════ */
+function methodHTML(){
+  return '<div class="mg">'+
+    '<div class="mc"><div class="mc-h"><div class="mpct" style="color:var(--grn)">30%</div><div class="mn">Conversion Rate</div></div><ul class="md"><li>Deliveries-in-period &divide; valid leads originated-in-period</li><li>Delivery = Lead Status Type \u201cSold\u201d (includes Pending Finance + Delivered)</li><li><strong>Split-date logic (v4.1):</strong> a lead originated last month that closes this month counts as a delivery this month, not a lead this month. Sale date is taken from Lead Last Modified Date</li><li>If Pending Finance later fails, VinSolutions flips to Lost \u2014 that row automatically drops off the rep\u2019s score on the next upload</li><li>Customers deduped globally by name / email / phone</li><li>Bad leads excluded from denominator</li><li>700 Credit + Airstream always excluded</li></ul></div>'+
+    '<div class="mc"><div class="mc-h"><div class="mpct" style="color:var(--blu)">20%</div><div class="mn">Delivery Volume</div></div><ul class="md"><li>Raw count of unique delivered customers</li><li>Normalized to the highest rep at this location</li><li>Recalculated fresh on every upload</li></ul></div>'+
+    '<div class="mc"><div class="mc-h"><div class="mpct" style="color:var(--gold)">15%</div><div class="mn">Speed to Lead</div></div><ul class="md"><li>Internet leads only \u2014 Walk-in / Phone not penalized</li><li>Median of VinSolutions Adjusted Response Time (BH-adjusted to Mon\u2013Sat 8AM\u20136PM Central)</li><li>ADJ=0 counts as instant response if attempt was logged at/after lead origination (e.g. overnight lead answered right at open)</li><li>Under 15 min = Full (15 pts)</li><li>Under 60 min = Strong (12 pts)</li><li>Under 240 min = Partial (8 pts)</li><li>Over 240 min = Minimum (4 pts)</li></ul></div>'+
+    '<div class="mc"><div class="mc-h"><div class="mpct" style="color:var(--pur)">15%</div><div class="mn">Contact Discipline</div></div><ul class="md"><li>Average of contact rate + multi-channel rate</li><li>Contact rate: Contacted Indicator = Yes</li><li>Multi-channel: 2+ of phone, email, text attempted</li></ul></div>'+
+    '<div class="mc"><div class="mc-h"><div class="mpct" style="color:var(--ora)">20%</div><div class="mn">Showroom Process</div></div><ul class="md"><li>Composite of normalized visits + write-ups</li><li>Both normalized to the highest rep on the floor</li><li>A row counts as a visit when Showroom Visit ID is populated and the Sales Rep is not on the manager blacklist</li><li>Deleted visits excluded</li><li>Visits whose Assigned User group is Manager / Reception / Admin excluded</li><li>Completed-by-Manager is normal desk workflow and is NOT used as an exclusion</li></ul></div>'+
+    '<div class="mc"><div class="mc-h"><div class="mpct" style="color:var(--t3)">0%</div><div class="mn">Not Scored</div></div><ul class="md"><li>Revenue and Front-End Gross are not displayed or scored</li><li>VinSolutions gross is pre-adjustment; IDS is authoritative for margin</li></ul></div>'+
+  '</div>'+
+  '<div class="panel" style="margin-bottom:9px"><div class="panel-t">Rep Exclusions \u2014 Every Upload, Every Store</div><ul class="md" style="font-size:12px;color:var(--t1)"><li>Managers and non-sales staff: 20-name blacklist (Tony Vitrano, Christian Borrouso, Shane Roberts, Pete Smith, Tyler Zimmerman, Ed Savage, Joe Steffen, Joshua Brevick, James Duos, Justin Mire, James Murphy, Tommy Sacran, Jerry Jones, Chris Seehorn, Matthew Kramer, Mike Lindemood, Steve Smith, Bradley Smart, Matthew Justice, John Schuster) plus Assigned-User user group = Manager / Reception / Admin. Note: \"John Schuster Jr\" is a salesperson and is NOT blacklisted.</li><li>v4.2: Per-store whitelists removed. Anyone appearing in the Sales Rep column who is not on the manager blacklist is now scored automatically \u2014 new hires no longer need a code update.</li><li>System accounts: "Your Friends at Great American RV" and YOD House Agent entries removed</li><li>700 Credit: Lead Source = "700credithmd" or Lead Source Group = "700 Credit"</li><li>Airstream: identified by Lead Source, Lead Source Group, OR Make (rules configurable in the AIRSTREAM_RULES block at the top of the script). Source-based matching catches leads with no vehicle attached.</li><li>Only Sales Rep is graded \u2014 if the row was worked by a manager it does not count</li><li>Minimum 10 valid leads required to be scored on rooftop tabs. The Airstream brand tab drops this floor to 1 because most reps see Airstream leads only occasionally and the 10-lead minimum would hide ~80% of the brand pipeline.</li><li>v4 note: Completed-By and Created-By user groups are not consulted \u2014 those columns describe normal manager-at-desk workflow, not who ran the visit</li></ul></div>'+
+  '<div class="panel" style="margin-bottom:9px"><div class="panel-t">Lineup Positions</div>'+
+  '<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'+
+    '<div><div style="font-family:var(--disp);font-size:13px;color:var(--gold);margin-bottom:3px">Starters (1\u20134)</div><div style="font-size:11px;color:var(--t1)">Top producers. Leading in conversion and volume. The benchmark for the floor.</div></div>'+
+    '<div><div style="font-family:var(--disp);font-size:13px;color:var(--blu);margin-bottom:3px">Lineup (5\u20139)</div><div style="font-size:11px;color:var(--t1)">Solid contributors. Delivering, engaged, and building toward the top.</div></div>'+
+    '<div><div style="font-family:var(--disp);font-size:13px;color:var(--pur);margin-bottom:3px">DH (Designated Hitter)</div><div style="font-size:11px;color:var(--t1)">High production in one area, gaps in others. Standout conversion, contact, or write-up rate but needs volume or floor presence.</div></div>'+
+    '<div><div style="font-family:var(--disp);font-size:13px;color:var(--t2);margin-bottom:3px">Bench</div><div style="font-size:11px;color:var(--t1)">Not yet producing at a starting level. Focus on conversion rate and floor presence to move up.</div></div>'+
+  '</div>'+
+'</div>'+
+'<div class="panel" style="margin-bottom:9px;border-color:rgba(200,208,219,.22);background:linear-gradient(180deg,var(--card) 0%,rgba(200,208,219,.025) 100%)"><div class="panel-t" style="color:#e8edf3">Airstream Brand Tab &mdash; v4.3</div><ul class="md" style="font-size:12px;color:var(--t1)"><li>The <strong style="color:#e8edf3">Airstream</strong> tab inverts the standard filter: it keeps <em>only</em> Airstream-identified rows and drops everything else.</li><li>A row counts as Airstream when its <em>Lead Source</em> contains <code style="font-family:var(--mono);font-size:11px;color:#e8edf3">airstream</code> OR <code style="font-family:var(--mono);font-size:11px;color:#e8edf3">aimbase</code>, OR its <em>Lead Source Group</em> contains <code style="font-family:var(--mono);font-size:11px;color:#e8edf3">airstream</code>, OR its <em>Make</em> contains <code style="font-family:var(--mono);font-size:11px;color:#e8edf3">airstream</code>. Aimbase is the dominant channel \u2014 in the May 2026 export 285 of 363 rows came through Aimbase-Hubspot, so excluding it would miss ~80% of the pipeline.</li><li>Source rooftops include all 9 GARV stores AND the <strong style="color:#e8edf3">Airstream of GARV</strong> rooftop (which was previously hidden from every other tab).</li><li>The Airstream tab also enforces the VinSolutions saved-filter rules: <code style="font-family:var(--mono);font-size:11px;color:#e8edf3">[Lead Source] Not Contains 700</code>, <code style="font-family:var(--mono);font-size:11px;color:#e8edf3">[Lead Status Custom] Not = Bad</code>, and <code style="font-family:var(--mono);font-size:11px;color:#e8edf3">[Lead Status Type] Not = Bad</code>. Other tabs keep their existing exact-match 700 Credit filter and do not enforce the Bad-status rules.</li><li>Scoring math, rep blacklist, lineup positions, speed-to-lead tiers, contact discipline, showroom process \u2014 all identical to a rooftop tab. The Airstream tab drops the 10-lead minimum to 1 lead so reps who handle the brand occasionally are still visible. A per-rooftop breakdown shows where each rep\'s Airstream leads originated, and a top-of-page band tallies each rooftop\'s Airstream pipeline.</li><li>The Network Overview KPIs deliberately exclude the Airstream tab to avoid double-counting \u2014 every rooftop already shows its non-Airstream totals; Airstream is a parallel brand view, not a 10th rooftop.</li><li>Reps appearing in both their rooftop tab and the Airstream tab are scored independently in each \u2014 the same person can be a Starter in Calera and a Bench in Airstream, or vice versa, because their denominator changes.</li><li>To tune any of these rules, edit the <code style="font-family:var(--mono);font-size:11px;color:#e8edf3">AIRSTREAM_RULES</code> block near the top of the script.</li></ul></div>'+
+'<div class="panel"><div class="panel-t">How the Learning System Works</div><ul class="md" style="font-size:12px;color:var(--t1)"><li>CSV files parsed entirely in-browser \u2014 no customer data leaves your device</li><li>Each upload recalculates all scores from raw data with all filters applied</li><li>Per-store history stored in browser localStorage \u2014 builds week-over-week trends</li><li>Baseball cards show \u25b2/\u25bc trend arrows once two uploads exist for the same store</li><li>AI Coach uses anonymized aggregate stats \u2014 configure proxy URL at top of script</li><li>Upload weekly \u2014 the dashboard learns and improves as data accumulates</li></ul></div>';
+}
+
+/* ══ CSV PARSER ══════════════════════════════════════════════
+   Custom positional parser because the master CSV has duplicate
+   column names (Dealer, Customer, Lead Source, Lead Type each
+   appear twice — once in the leads section, once in the visits
+   section). We keep every row as an array and carry a column
+   index map (H) alongside it.
+════════════════════════════════════════════════════════════ */
+function parseMasterCSV(txt){
+  // Robust CSV line parser supporting quoted fields with commas
+  const lines=[];
+  let cur='',inQ=false;
+  for(let i=0;i<txt.length;i++){
+    const ch=txt[i];
+    if(ch==='"'){
+      // handle "" as an escaped quote inside quoted field
+      if(inQ&&txt[i+1]==='"'){cur+='"';i++;continue;}
+      inQ=!inQ;continue;
+    }
+    if(ch==='\n'&&!inQ){lines.push(cur);cur='';continue;}
+    if(ch==='\r'&&!inQ){continue;}
+    cur+=ch;
+  }
+  if(cur.length)lines.push(cur);
+
+  if(lines.length<2)return null;
+
+  // First line is header. Split it on unquoted commas — but we already
+  // stripped quotes above, so a simple split works because we consumed
+  // quoted commas into 'cur' during the first pass. Wait — we didn't.
+  // Re-parse each line properly with a field splitter that handles
+  // embedded commas (which we do need, because Visit Notes can contain
+  // commas, and Customer names can too).
+  // Simpler: re-parse from scratch using a proper field splitter.
+  return parseMasterCSVv2(txt);
+}
+
+function parseMasterCSVv2(txt){
+  // Proper RFC-ish CSV parser: tokenize into rows of fields.
+  const rows=[];
+  let row=[],field='',inQ=false;
+  for(let i=0;i<txt.length;i++){
+    const ch=txt[i];
+    if(inQ){
+      if(ch==='"'){
+        if(txt[i+1]==='"'){field+='"';i++;}
+        else{inQ=false;}
+      } else {
+        field+=ch;
+      }
+    } else {
+      if(ch==='"'){inQ=true;}
+      else if(ch===','){row.push(field);field='';}
+      else if(ch==='\n'){row.push(field);rows.push(row);row=[];field='';}
+      else if(ch==='\r'){/* skip */}
+      else{field+=ch;}
+    }
+  }
+  if(field.length||row.length){row.push(field);rows.push(row);}
+  if(rows.length<2)return null;
+
+  // Strip BOM from first cell
+  rows[0][0]=rows[0][0].replace(/^\uFEFF/,'');
+  const header=rows[0];
+
+  // Build a name→index map. For columns that appear more than once,
+  // the FIRST occurrence wins by default (the leads section). We give
+  // explicit "_2" keys for the second occurrence.
+  const H={};
+  for(let i=0;i<header.length;i++){
+    const name=header[i].trim();
+    if(!(name in H)) H[name]=i;
+    else H[name+'_2']=i;
+  }
+  // Expose the raw header array so PII-column detection can find ALL
+  // occurrences of a duplicate-named column (e.g. "Customer" appears
+  // twice — once in the leads section, once in the visits section).
+  H.allHeaders = header.map(h => h.trim());
+
+  // Define friendly aliases on H for the columns we actually read.
+  // Canonical (leads section, first occurrence):
+  H.LEAD_SOURCE    = H['Lead Source'];
+  H.LEAD_TYPE      = H['Lead Type'];
+  H.LEAD_SRC_GROUP = H['Lead Source Group'];
+  H.LEAD_STATUS    = H['Lead Status'];
+  H.LEAD_STATUS_CUSTOM=H['Lead Status Custom'];
+  H.LEAD_STATUS_TYPE=H['Lead Status Type'];
+  H.ADJ_RT         = H['Adjusted Response Time (Min)'];
+  H.ACT_RT         = H['Actual Response Time (Min)'];
+  H.CONTACTED      = H['Contacted Indicator'];
+  H.SALES_REP      = H['Sales Rep'];
+  H.MAKE           = H['Make'];
+  H.LEAD_ORIG      = H['Lead Origination Date'];
+  H.LEAD_MOD       = H['Lead Last Modified Date'];
+  H.CUSTOMER       = H['Customer'];
+  H.DEALER         = H['Dealer'];
+  // NOTE: H.SOLD_COUNT intentionally NOT mapped. Sold Count from
+  // VinSolutions includes legacy sale records from previous versions
+  // of the same lead — a lead that was sold, then unwound (financing
+  // fell through, customer backed out), then reopened as Active will
+  // still have Sold Count > 0 even though it is no longer a delivery.
+  // The dashboard uses Lead Status Type === 'Sold' as the sole
+  // delivery signal — see isDelivered() for details. Audit on the
+  // May 2026 Hattiesburg export found 23 of 482 rows (4.8%) where
+  // Sold Count > 0 but Lead Status Type != 'Sold'. Trusting Sold
+  // Count would have overcounted Hattiesburg deliveries by ~11%.
+  H.LAST_EMAIL     = H['Last Attempted Email Contact'];
+  H.LAST_PHONE     = H['Last Attempted Phone Contact'];
+  H.LAST_TEXT      = H['Last Attempted Text Contact Datetime'];
+  H.EMAIL          = H['Email'];
+  H.DAY_PHONE      = H['Daytime Phone'];
+  H.EVE_PHONE      = H['Evening Phone'];
+  H.CELL_PHONE     = H['Cell Phone'];
+  // Visit section (second occurrence of dup names, plus visit-only cols):
+  H.VISIT_ID       = H['Showroom Visit ID'];
+  H.ASSIGNED_USER  = H['Assigned User'];
+  H.ASSIGNED_GROUP = H['Assigned User - User Group'];
+  H.TO_MANAGER     = H['TO Manager'];
+  H.TO_MANAGER_GROUP=H['TO Manager - User Group'];
+  H.CREATED_BY_GROUP=H['Created By User - User Group'];
+  H.COMPLETED_BY_GROUP=H['Completed By User - User Group'];
+  H.VISIT_RESULT   = H['Visit Result'];
+  H.WRITE_UP       = H['Write Up'];
+  H.TRADE_APP      = H['Trade Appraisal'];
+  H.VISIT_STATUS   = H['Status'];
+
+  return {rows:rows.slice(1).filter(r=>r.length>1),H};
+}
+
+/* ══ SHAPE GUARD ═════════════════════════════════════════════ */
+// A master CSV has both leads columns AND visit columns in the header.
+// We detect a valid master by checking for several columns that only
+// exist when both sections are merged.
+function looksLikeMasterCSV(parsed){
+  if(!parsed) return false;
+  const H=parsed.H;
+  return H.SALES_REP!==undefined && H.VISIT_RESULT!==undefined && H.WRITE_UP!==undefined && H.CONTACTED!==undefined;
+}
+
+/* ══ REP / MANAGER RULES ═════════════════════════════════════ */
+const normName=n=>String(n||'').trim().replace(/\s+/g,' ').toLowerCase();
+const BLACKLIST=new Set([
+  'Tony Vitrano','Christian Borrouso','Shane Roberts','Pete Smith',
+  'Tyler Zimmerman','Ed Savage','Joe Steffen','Joshua Brevick',
+  'James Duos','Justin Mire','James Murphy','Tommy Sacran',
+  'Jerry Jones','Chris Seehorn','Matthew Kramer','Mike Lindemood',
+  'Steve Smith','Bradley Smart','Matthew Justice',
+  // NOTE: 'John Schuster' is the manager. 'John Schuster Jr' is a salesperson
+  // and normalizes to a different string, so only the manager is blocked here.
+  'John Schuster'
+].map(normName));
+const SYS_PATTERNS=['your friends at great american rv','yod house agent'];
+const MGR_GROUPS=new Set(['Manager','Reception','Admin']);
+const STORE_WHITELISTS={
+  /* v4.2 (May 2026) — Per-store whitelists removed.
+     We now accept anyone listed in the Sales Rep column who is not on
+     the manager BLACKLIST, not a system account, and not in a manager
+     user group. This auto-picks up new hires without code changes. */
+};
+const isSysAccount=name=>{const n=normName(name);return SYS_PATTERNS.some(p=>n.includes(p))};
+const isTrackedRep=(storeId,name)=>{
+  const n=normName(name);
+  if(!n) return false;
+  if(BLACKLIST.has(n)) return false;
+  if(isSysAccount(n)) return false;
+  return true;
+};
+
+/* ══ CORE RECOMPUTE ══════════════════════════════════════════
+   rows:  array of raw CSV row arrays (positional)
+   H:     column-index map (incl. aliases)
+   Returns the same shape as the old dashboard so downstream
+   rendering code is unchanged.
+════════════════════════════════════════════════════════════ */
+const BAD_STATUSES=new Set(['Bad Credit','Bad or no contact information','Dealer test lead','Duplicate lead','No intent to buy','Out of market','Purchased different brand different dealer','Purchased from private party','Requested no further contact']);
+
+function recompute(rows,H,storeId,fromStr,toStr){
+  /* --- v4.1 SPLIT-DATE PIPELINE ─────────────────────────────────
+     Per the May 2026 logic-corrections spec:
+       • Lead count (denominator) = unique customers whose canonical
+         row has Lead Origination Date in-period.
+       • Delivery count (numerator) = unique customers whose cluster
+         contains any row with Lead Status Type = 'Sold' AND Lead
+         Last Modified Date in-period (proxy for sale date).
+     A lead originating before the period that closes in-period is
+     correctly counted as an in-period delivery (and is NOT counted
+     as an in-period lead — that would inflate the denominator with
+     a customer who came in months ago).
+  ─────────────────────────────────────────────────────────────── */
+
+  /* --- Step 1: Hard filters (always apply, period-independent) ---
+     - 700 Credit lead source / source-group
+         · Standard rooftop tab → exact match (legacy behavior, unchanged)
+         · Airstream brand tab  → substring match anywhere in Lead Source
+           or Lead Source Group (mirrors VinSolutions filter
+           "[Lead Source] Not Contains 700")
+     - Airstream identification driven by AIRSTREAM_RULES at the top
+       of the script. Checks Lead Source + Lead Source Group + Make
+       (Source is the most reliable signal since some leads come
+       through with no vehicle attached).
+         · Standard rooftop tab → EXCLUDE Airstream rows
+         · Airstream brand tab  → KEEP ONLY Airstream rows
+     - Airstream brand tab ALSO enforces [Lead Status Custom] Not = Bad
+       AND [Lead Status Type] Not = Bad (mirrors VinSolutions filter).
+       Other tabs are unaffected.
+     - Rows where Sales Rep is empty, a system account, or blacklisted
+       (manager / BDC / house account). v4.2: per-store whitelists
+       removed — anyone in the Sales Rep column who is not on the
+       manager blacklist is now scored.
+  */
+  const isAirstreamTab = storeId === 'airstream';
+  const filtered=rows.filter(r=>{
+    const src=(r[H.LEAD_SOURCE]||'').trim();
+    const grp=(r[H.LEAD_SRC_GROUP]||'').trim();
+    if(isAirstreamTab){
+      // Substring "700" anywhere in source or group, case-insensitive.
+      if(src.toLowerCase().includes('700')) return false;
+      if(grp.toLowerCase().includes('700')) return false;
+    } else {
+      // Rooftop tabs: legacy exact match (unchanged behavior).
+      if(src==='700credithmd'||grp==='700 Credit') return false;
+    }
+    const isAirstream = isAirstreamLead(r, H);
+    if(isAirstreamTab){
+      if(!isAirstream) return false;            // brand tab: only Airstream
+      // Bad-status enforcement only on the Airstream tab.
+      if(isAirstreamBadStatus(r, H)) return false;
+    } else {
+      if(isAirstream) return false;             // rooftop tab: drop Airstream
+    }
+    const rep=(r[H.SALES_REP]||'').trim();
+    if(!rep||!isTrackedRep(storeId,rep)) return false;
+    return true;
+  });
+
+  /* --- Step 2: Global customer dedup (period-independent) ---
+     Cluster by name / email / phone union-find; pick canonical row
+     per cluster (Sold first, then earliest origination). This gives
+     us one row per unique customer across the entire dataset.
+  */
+  const dedup=dedupCustomers(filtered,H);
+
+  /* --- Step 3: Period classification per canonical row ---
+     For each unique customer, decide:
+       • inLeadPeriod  — Lead Origination Date in-period?
+       • inSalePeriod  — Sold AND Lead Last Modified Date in-period?
+     A row can be neither (out-of-period lead that didn't close), one
+     (an in-period lead, an out-of-month sale that closed in-period),
+     or both (an in-period lead that closed in-period).
+  */
+  const fromMs = fromStr ? new Date(fromStr).getTime() : null;
+  const toMs   = toStr   ? new Date(toStr).setHours(23,59,59,999) : null;
+  const inRange = ms => {
+    if (isNaN(ms)) return false;
+    if (fromMs !== null && ms < fromMs) return false;
+    if (toMs   !== null && ms > toMs)   return false;
+    return true;
+  };
+  // No date filter set → everything counts on both sides
+  const noFilter = (fromMs === null && toMs === null);
+
+  const classified = dedup.map(r => {
+    const origMs = Date.parse(r[H.LEAD_ORIG] || '');
+    const modMs  = Date.parse(r[H.LEAD_MOD]  || '');
+    const sold   = isDelivered(r, H);
+    const inLeadPeriod = noFilter ? true : (isNaN(origMs) ? true : inRange(origMs));
+    // Delivery date = Lead Last Modified Date (per spec §2 priority 2).
+    // If modMs is unparseable, fall back to origination so an obvious
+    // sold row isn't silently dropped.
+    // CRITICAL: must AND with `sold` even when noFilter, otherwise every
+    // row gets counted as a delivery (was producing 100%+ conv rates).
+    const saleDateMs = !isNaN(modMs) ? modMs : origMs;
+    const inSalePeriod = sold && (noFilter ? true : inRange(saleDateMs));
+    return { row: r, sold, inLeadPeriod, inSalePeriod };
+  });
+
+  // A row is kept downstream if it contributes to lead OR delivery
+  // counts in this period. Out-of-period rows that aren't sold-this-
+  // period are dropped entirely so they don't pollute speed/contact
+  // medians.
+  const keep = classified.filter(c => c.inLeadPeriod || c.inSalePeriod);
+
+  /* --- Step 4: Group kept rows by sales rep --- */
+  const byRep={};
+  keep.forEach(c=>{
+    const rep=(c.row[H.SALES_REP]||'').trim();
+    (byRep[rep]=byRep[rep]||[]).push(c);
+  });
+
+  /* --- Step 5: Per-rep lead stats with split-date semantics --- */
+  const leadStats={};
+  Object.entries(byRep).forEach(([rep,classifiedRows])=>{
+    // Lead pool: rows that originated in-period (denominator scope)
+    const inPeriodLeads = classifiedRows.filter(c => c.inLeadPeriod);
+    // Bad statuses excluded from denominator
+    const validLeads = inPeriodLeads.filter(c =>
+      !BAD_STATUSES.has((c.row[H.LEAD_STATUS]||'').trim())
+    );
+    // Delivery pool: ANY row (including out-of-period leads) that
+    // closed in-period. This is the spec's split — a sold deal whose
+    // lead came in last month still counts as a delivery this month.
+    const deliveriesInPeriod = classifiedRows.filter(c => c.inSalePeriod);
+    // v4.3.7 — Split-date visibility. Count deliveries-in-period that
+    // originated BEFORE the period. These are sales that closed in
+    // the filter window but came from leads generated in a prior
+    // window. Surfaced in the UI so leadership can see why the
+    // delivery count holds steady while the lead count drops when
+    // a date filter is applied. Equal to deliveriesInPeriod when no
+    // filter is active because every row is then "in lead period."
+    const priorPeriodDeliveries = classifiedRows.filter(c => c.inSalePeriod && !c.inLeadPeriod).length;
+
+    // Speed and contact metrics computed on validLeads (in-period
+    // origination only) — these are about how the rep handled NEW
+    // leads in-period, which makes both metrics meaningful.
+    const internet=validLeads.filter(c=>(c.row[H.LEAD_TYPE]||'').trim()==='Internet');
+    const adj=[];
+    internet.forEach(c=>{
+      const u={row:c.row};
+      const v=parseFloat(u.row[H.ADJ_RT]);
+      if(isNaN(v)) return;
+      if(v>0){adj.push(v);return;}
+      const leadTs=Date.parse(u.row[H.LEAD_ORIG]||'');
+      if(isNaN(leadTs)) return;
+      const attempts=[u.row[H.LAST_PHONE],u.row[H.LAST_EMAIL],u.row[H.LAST_TEXT]]
+        .map(s=>Date.parse(s||''))
+        .filter(t=>!isNaN(t));
+      if(attempts.length===0) return;
+      const hasValid=attempts.some(t=>t>=leadTs);
+      if(hasValid) adj.push(0);
+    });
+    const median=a=>a.length?[...a].sort((x,y)=>x-y)[Math.floor(a.length/2)]:null;
+    const mA=adj.length>=3 ? median(adj) : null;
+    let sp=10,st='N/A';
+    if(mA===null){sp=10;st='N/A';}
+    else if(mA<15){sp=15;st='Full';}
+    else if(mA<60){sp=12;st='Strong';}
+    else if(mA<240){sp=8;st='Partial';}
+    else {sp=4;st='Minimum';}
+
+    const contacted=validLeads.filter(c=>(c.row[H.CONTACTED]||'').trim()==='Yes').length;
+    const cr=validLeads.length?contacted/validLeads.length:0;
+    const multi=validLeads.filter(c=>{
+      let cnt=0;
+      if(c.row[H.LAST_PHONE]?.trim())cnt++;
+      if(c.row[H.LAST_EMAIL]?.trim())cnt++;
+      if(c.row[H.LAST_TEXT ]?.trim())cnt++;
+      return cnt>=2;
+    }).length;
+    const mcr=validLeads.length?multi/validLeads.length:0;
+
+    leadStats[rep]={
+      valid_leads:validLeads.length,
+      bad_leads:inPeriodLeads.length-validLeads.length,
+      delivered:deliveriesInPeriod.length,
+      prior_period_deliveries:priorPeriodDeliveries,
+      internet_leads:internet.length,
+      // Conversion = deliveries-in-period / valid-leads-originated-in-period.
+      // Numerator and denominator are intentionally measured on
+      // different cohorts of customers per the spec — this is a
+      // throughput rate for the period, not a same-customer rate.
+      conv_rate:validLeads.length?deliveriesInPeriod.length/validLeads.length:0,
+      med_adj:mA,
+      speed_pts:sp,speed_tier:st,
+      contact_rate:cr,multi_ch_rate:mcr,
+      contact_disc:(cr+mcr)/2,
+      // v4.3.4: The Airstream brand tab drops the 10-lead minimum.
+      // Most reps see Airstream leads only occasionally (Tara Birkla
+      // handles them at 2 rooftops, Hollie Hattabaugh runs the GARV
+      // Airstream rooftop, the rest see 1-9 per period). Filtering
+      // them out hides 80% of the pipeline. Rooftop tabs keep the
+      // 10-lead floor since rooftops have enough volume to make it
+      // a meaningful statistical floor.
+      scoreable: storeId==='airstream' ? validLeads.length>=1 : validLeads.length>=10
+    };
+  });
+
+  // Normalize delivery volume to top rep at this location
+  const scoreableDels=Object.values(leadStats).filter(d=>d.scoreable).map(d=>d.delivered);
+  const maxDel=Math.max(...scoreableDels,1);
+  Object.values(leadStats).forEach(d=>d.vol_norm=d.delivered/maxDel);
+
+  /* --- Collect per-rep visit stats ───────────────────────────
+     v4 FIX: every row with a Showroom Visit ID where the Sales
+     Rep (col L) survives the row-level pre-filter counts as a
+     visit for that rep. This is the credit rule Jordan asked for.
+
+     What changed from v3: v3 had a guard that dropped any visit
+     whose Completed By User - User Group was Manager / Reception
+     / Admin. In normal operation the manager at the desk closes
+     out *every* visit — that column is "Manager" on ~96% of
+     visits at every store — so v3 silently dropped almost all
+     visit credit and every rep showed 0 across the board.
+
+     The correct guard: skip visits where the *Assigned User*
+     (the person actually working the floor) belongs to a manager
+     group. We do NOT look at Completed By or Created By — those
+     describe normal desk workflow, not who ran the visit.
+
+     We still drop:
+       - rows with no Visit ID (lead-only rows)
+       - Visit Result = "Deleted" (these are CRM cancellations)
+       - rows where the Assigned User's user group is a manager
+         group (rare, but a real safety belt)
+       - rows whose Sales Rep failed the row-level pre-filter
+         (already handled — `filtered` is the post-filter set)
+  */
+  const visitStats={};
+  filtered.forEach(r=>{
+    const vid=(r[H.VISIT_ID]||'').trim();
+    if(!vid) return;
+    const vr=(r[H.VISIT_RESULT]||'').trim();
+    if(vr==='Deleted') return;
+    // Manager guard — only the floor-rep group matters here.
+    // Completed-by-group / created-by-group are NOT consulted: those
+    // are always Manager / Reception by VinSolutions design.
+    const ag=(r[H.ASSIGNED_GROUP]||'').trim();
+    if(MGR_GROUPS.has(ag)) return;
+    // Sales Rep (col L) is the canonical score-owner. In Hammond's
+    // master report Sales Rep == Assigned User on every visit row;
+    // we use Sales Rep so this stays consistent with lead credit.
+    const rep=(r[H.SALES_REP]||'').trim();
+    if(!rep) return;
+    const s=visitStats[rep]=visitStats[rep]||{visits:0,write_ups:0,trades:0,user_group:''};
+    s.visits++;
+    if((r[H.WRITE_UP]||'').trim()==='Y') s.write_ups++;
+    if((r[H.TRADE_APP]||'').trim()==='Y') s.trades++;
+    if(!s.user_group && ag) s.user_group=ag;
+  });
+  const mxV=Math.max(...Object.values(visitStats).map(d=>d.visits),1);
+  const mxW=Math.max(...Object.values(visitStats).map(d=>d.write_ups),1);
+  Object.values(visitStats).forEach(d=>{
+    d.wr=d.visits?d.write_ups/d.visits:0;
+    d.sr=(d.visits/mxV + d.write_ups/mxW)/2;
+  });
+
+  /* --- Compose scored rep list --- */
+  // v4.3.4: On the Airstream tab, compute a per-dealer breakdown for
+  // each rep AND aggregate per-store totals across the tab. Reps that
+  // handle Airstream leads at multiple rooftops (e.g. Tara Birkla,
+  // who carries them at both the GARV Airstream rooftop and her home
+  // store) show up in multiple dealer buckets, which is the right
+  // reflection of how cross-rooftop brand pipelines actually work.
+  // (isAirstreamTab already declared earlier in this function.)
+  const perRepDealer = {};      // rep -> dealer -> {leads, delivered, valid_leads}
+  const perStoreTotals = {};    // dealer -> {leads, delivered, reps:Set}
+  if(isAirstreamTab){
+    Object.entries(byRep).forEach(([rep, classifiedRows]) => {
+      classifiedRows.forEach(c => {
+        const dealer = cleanDealerName((c.row[H.DEALER] || '').trim()) || 'Unknown';
+        const inLead = c.inLeadPeriod;
+        const valid  = inLead && !BAD_STATUSES.has((c.row[H.LEAD_STATUS]||'').trim());
+        const sold   = c.inSalePeriod;
+        if(!perRepDealer[rep]) perRepDealer[rep] = {};
+        const rd = perRepDealer[rep][dealer] = perRepDealer[rep][dealer] || {dealer, leads:0, valid_leads:0, delivered:0};
+        if(inLead) rd.leads++;
+        if(valid)  rd.valid_leads++;
+        if(sold)   rd.delivered++;
+        const sd = perStoreTotals[dealer] = perStoreTotals[dealer] || {dealer, leads:0, valid_leads:0, delivered:0, reps:new Set()};
+        if(inLead) sd.leads++;
+        if(valid)  sd.valid_leads++;
+        if(sold)   sd.delivered++;
+        if(rep) sd.reps.add(rep);
+      });
+    });
+  }
+
+  const reps=[];
+  Object.entries(leadStats).forEach(([rep,ls])=>{
+    if(!ls.scoreable) return;
+    if(BLACKLIST.has(normName(rep))||isSysAccount(rep)) return;
+    const s=visitStats[rep]||{visits:0,write_ups:0,trades:0,wr:0,sr:0,user_group:''};
+    const cp=ls.conv_rate*30;
+    const vp=ls.vol_norm*20;
+    const spp=ls.speed_pts;
+    const conp=ls.contact_disc*15;
+    const fp=s.sr*20;
+    const repObj = {
+      pos:0,name:rep,group:s.user_group||'Sales',lineup:'Bench',
+      composite:+(cp+vp+spp+conp+fp).toFixed(1),
+      conv_rate:ls.conv_rate,conv_pts:+cp.toFixed(1),
+      delivered:ls.delivered,prior_period_deliveries:ls.prior_period_deliveries||0,vol_norm:ls.vol_norm,vol_pts:+vp.toFixed(1),
+      med_adj:ls.med_adj,speed_tier:ls.speed_tier,speed_pts:spp,
+      internet_leads:ls.internet_leads,
+      contact_rate:ls.contact_rate,multi_ch_rate:ls.multi_ch_rate,
+      contact_disc:ls.contact_disc,contact_pts:+conp.toFixed(1),
+      visits:s.visits,write_ups:s.write_ups,trades:s.trades,
+      writeup_rate:s.wr,floor_pts:+fp.toFixed(1),
+      valid_leads:ls.valid_leads,bad_leads:ls.bad_leads
+    };
+    // Attach per-dealer breakdown on the Airstream tab.
+    if(isAirstreamTab && perRepDealer[rep]){
+      repObj.byDealer = Object.values(perRepDealer[rep])
+        .sort((a,b) => b.valid_leads - a.valid_leads);
+    }
+    reps.push(repObj);
+  });
+
+  // Rank and assign lineup
+  reps.sort((a,b)=>b.composite-a.composite);
+  reps.forEach((r,i)=>{
+    r.pos=i+1;
+    if(i<4) r.lineup='Starter';
+    else if(i<9) r.lineup='Lineup';
+    else {
+      const isDH=(r.conv_rate>=0.18)||(r.contact_disc>=0.90)||(r.writeup_rate>=0.75);
+      r.lineup=isDH?'DH':'Bench';
+      if(isDH){
+        const str=r.conv_rate>=0.18?'conversion rate ('+pct(r.conv_rate)+')':
+                  r.contact_disc>=0.90?'contact discipline ('+pct(r.contact_disc)+')':
+                  'write-up rate ('+pct(r.writeup_rate)+')';
+        r.bench_note='Standout '+str+'. Floor presence or volume is the gap \u2014 focus there to move into the Lineup.';
+      }
+    }
+  });
+
+  const result = {
+    period:'Uploaded '+today(),generated:today(),
+    totals:{
+      total_leads:reps.reduce((s,r)=>s+r.valid_leads,0),
+      delivered:reps.reduce((s,r)=>s+r.delivered,0),
+      // v4.3.7 — Of the delivered above, how many came from leads that
+      // originated BEFORE the current date window. Lets us surface
+      // "251 delivered (28 from pre-period leads)" so the split-date
+      // pipeline is visible to leadership at a glance.
+      prior_period_deliveries:reps.reduce((s,r)=>s+(r.prior_period_deliveries||0),0),
+      avg_conv:reps.length?reps.reduce((s,r)=>s+r.conv_rate,0)/reps.length:0,
+      total_visits:reps.reduce((s,r)=>s+r.visits,0),
+      total_writeups:reps.reduce((s,r)=>s+r.write_ups,0),
+      total_sales_people:Object.keys(byRep).length,
+      max_del:maxDel
+    },
+    reps
+  };
+  // v4.3.4: include the per-store rollup on the Airstream tab.
+  if(isAirstreamTab){
+    result.byStore = Object.values(perStoreTotals).map(s => ({
+      dealer: s.dealer,
+      leads: s.leads,
+      valid_leads: s.valid_leads,
+      delivered: s.delivered,
+      conv_rate: s.valid_leads ? s.delivered / s.valid_leads : 0,
+      rep_count: s.reps.size,
+    })).sort((a,b) => b.delivered - a.delivered || b.leads - a.leads);
+  }
+  return result;
+}
+
+function isDelivered(r,H){
+  // Delivery is defined strictly by Lead Status Type == "Sold".
+  // Maps to Lead Status ∈ {Delivered, Pending Finance}.
+  //
+  // PENDING FINANCE ROLLOFF: If a deal is Pending Finance in one upload
+  // and the financing falls through before the next upload, VinSolutions
+  // flips the Lead Status to "Bad Credit" or "No agreement reached",
+  // which both have Lead Status Type = "Lost". That row then returns
+  // false here, so the rep automatically loses the delivery credit on
+  // the next scoring run. No manual cleanup needed — scoring is
+  // recomputed fresh from the uploaded CSV every time.
+  //
+  // Visit Result is NOT consulted — a visit marked Sold Pending without
+  // the lead itself closed in VinSolutions is not a delivery yet.
+  return (r[H.LEAD_STATUS_TYPE]||'').trim()==='Sold';
+}
+
+/* ══ GLOBAL CUSTOMER DEDUP ═══════════════════════════════════
+   Collapses rows where the same customer appears more than once —
+   whether under one rep (same lead multiple visits) or across reps
+   (lead reassigned / duplicated). Two rows are considered the same
+   customer if they share ANY of: normalized name, email, or phone.
+   Phones are normalized to digits only; short/junk values are skipped.
+   We keep the row with the strongest sold signal; ties broken by
+   latest Lead Origination Date.
+════════════════════════════════════════════════════════════ */
+function normPhone(p){
+  const d=String(p||'').replace(/\D/g,'');
+  // Strip leading country code if present
+  const s=d.length===11&&d.startsWith('1')?d.slice(1):d;
+  return s.length===10?s:'';
+}
+function normEmail(e){const s=String(e||'').trim().toLowerCase();return s.includes('@')?s:''}
+function normCust(c){return String(c||'').trim().toLowerCase().replace(/\s+/g,' ')}
+
+function dedupCustomers(rows,H){
+  // Union-find over rows. Each row is a node; we merge if it shares a
+  // non-empty identity key with any other row.
+  const n=rows.length;
+  const parent=new Array(n);for(let i=0;i<n;i++)parent[i]=i;
+  const find=(x)=>{while(parent[x]!==x){parent[x]=parent[parent[x]];x=parent[x];}return x;};
+  const union=(a,b)=>{const ra=find(a),rb=find(b);if(ra!==rb)parent[ra]=rb;};
+
+  const byName={},byEmail={},byPhone={};
+  for(let i=0;i<n;i++){
+    const r=rows[i];
+    const nm=normCust(r[H.CUSTOMER]);
+    const em=normEmail(r[H.EMAIL]);
+    const phones=[r[H.DAY_PHONE],r[H.EVE_PHONE],r[H.CELL_PHONE]].map(normPhone).filter(Boolean);
+    if(nm){if(byName[nm]!==undefined)union(i,byName[nm]);else byName[nm]=i;}
+    if(em){if(byEmail[em]!==undefined)union(i,byEmail[em]);else byEmail[em]=i;}
+    for(const ph of phones){if(byPhone[ph]!==undefined)union(i,byPhone[ph]);else byPhone[ph]=i;}
+  }
+
+  // Bucket rows by root
+  const groups={};
+  for(let i=0;i<n;i++){
+    const k=find(i);
+    (groups[k]=groups[k]||[]).push(i);
+  }
+
+  // For each group, pick the winning row: prefer delivered, then
+  // latest Lead Origination Date.
+  const winners=[];
+  for(const k in groups){
+    const idxs=groups[k];
+    if(idxs.length===1){winners.push(rows[idxs[0]]);continue;}
+    let best=idxs[0],bestSold=isDelivered(rows[best],H),bestTs=Date.parse(rows[best][H.LEAD_ORIG]||'')||0;
+    for(let j=1;j<idxs.length;j++){
+      const i=idxs[j],sold=isDelivered(rows[i],H),ts=Date.parse(rows[i][H.LEAD_ORIG]||'')||0;
+      if((sold&&!bestSold)||(sold===bestSold&&ts>bestTs)){best=i;bestSold=sold;bestTs=ts;}
+    }
+    winners.push(rows[best]);
+  }
+  return winners;
+}
+
+/* Note on BH-adjusted response time: VinSolutions' "Adjusted Response
+   Time (Min)" column is already business-hours-adjusted to store hours
+   (Mon–Sat 8AM–6PM Central). A lead arriving at 10PM has its clock
+   started at next open inside that column. We use it directly as the
+   source of truth and do NOT attempt to re-derive BH minutes from the
+   Last Attempted timestamps — those log last attempt, not first touch,
+   so they're unreliable for first-response speed. */
+
+/* ══ UPLOAD ══════════════════════════════════════════════════ */
+function openUpload(){
+  if(curStore==='network'){
+    const labels = STORES.map((s,i)=>(i+1)+'. '+s.name+(s.isAirstream?'  (brand \u2014 cross-rooftop)':'')).join('\n');
+    const choice=prompt('Upload data for which store?\n\n'+labels+'\n\nEnter a number (1-'+STORES.length+'):');
+    const idx=parseInt(choice,10)-1;
+    if(isNaN(idx)||idx<0||idx>=STORES.length)return;
+    ulTarget=STORES[idx].id;
+  } else {
+    ulTarget=curStore;
+  }
+  showUpload();
+}
+function openUploadFor(id){ulTarget=id;showUpload()}
+function showUpload(){
+  const s=STORES.find(x=>x.id===ulTarget);
+  document.getElementById('ul-lbl').textContent=s?s.name:ulTarget;
+  // Recolor the store label silver for the Airstream brand tab, gold otherwise.
+  const lbl=document.getElementById('ul-lbl');
+  if(lbl) lbl.style.color = (s&&s.isAirstream) ? '#e8edf3' : 'var(--gold)';
+  // Swap helper copy for the Airstream brand tab.
+  const helper=document.getElementById('ul-helper');
+  if(helper){
+    if(s&&s.isAirstream){
+      helper.innerHTML='Drop a VinSolutions master lead export for <strong style="color:#e8edf3">Airstream</strong>. '+
+        'We keep only rows identified as Airstream \u2014 matched by <em>Lead Source</em>, <em>Lead Source Group</em>, or <em>Make</em>. '+
+        'Leads can originate from any of the 9 rooftops or the <strong style="color:#e8edf3">Airstream of GARV</strong> rooftop. '+
+        '700 Credit leads are still excluded. All other scoring rules (rep blacklist, lineup positions) are identical to a rooftop tab \u2014 except the Airstream tab drops the 10-lead minimum to 1 so every rep who touched an Airstream lead is shown.';
+    } else {
+      helper.innerHTML='Drop a VinSolutions master lead export (<span style="color:var(--gold);font-family:var(--mono);font-size:11px">storename_master_leads_dd_mm_yy.csv</span>). '+
+        '700 Credit and Airstream leads are removed automatically. The file contains both leads and showroom visits in one report.';
+    }
+  }
+  document.getElementById('ul-flist').innerHTML='';
+  document.getElementById('proc-btn').disabled=true;
+  document.getElementById('file-input-hidden').value='';
+  pending=[];openOv('ov-upload');
+}
+function handleFiles(files){
+  pending=Array.from(files);
+  document.getElementById('ul-flist').innerHTML=pending.map(f=>'<div class="fi"><span>&#128196;</span><span class="fi-n">'+f.name+'</span><span class="fi-s">'+(f.size/1024).toFixed(0)+' KB</span></div>').join('');
+  document.getElementById('proc-btn').disabled=pending.length===0;
+}
+
+function processUpload(){
+  if(!pending.length) return;
+  const btn=document.getElementById('proc-btn');
+  btn.disabled=true;btn.textContent='Processing\u2026';
+  // Only one master CSV per upload — use the first CSV in the list.
+  const f=pending[0];
+  const rd=new FileReader();
+  rd.onload=e=>{
+    try{
+      const txt=e.target.result;
+      const parsed=parseMasterCSVv2(txt);
+      if(!parsed||!looksLikeMasterCSV(parsed)){
+        toast('This does not look like a master lead CSV. Export the combined master lead report from VinSolutions.','red');
+        btn.disabled=false;btn.textContent='Process & Update Scores';
+        return;
+      }
+      finish(txt,parsed,btn,f.name);
+    }catch(err){
+      console.error(err);
+      toast('Parse error: '+err.message,'red');
+      btn.disabled=false;btn.textContent='Process & Update Scores';
+    }
+  };
+  rd.readAsText(f);
+}
+
+function finish(masterText,parsed,btn,fileName){
+  try{
+    const ex=getStoreData(ulTarget);
+    const newData=recompute(parsed.rows,parsed.H,ulTarget,'','');
+    // v4.3.3: raw CSV goes into the in-memory cache (session-only),
+    // never onto the data object that gets persisted to localStorage.
+    setRawCSV(ulTarget, masterText);
+    newData._sourceFile=fileName||'';
+    // v4.3.5: stamp client-side timestamp so cross-browser hydration
+    // comparator (server uploadedAt vs local uploadedAt) works. The
+    // server stores its own ISO timestamp at upload time; we mirror
+    // ours here so they're directly comparable. Within a couple-second
+    // clock-skew tolerance this gives us reliable newest-wins on every
+    // load, regardless of which browser uploaded.
+    newData.uploadedAt = new Date().toISOString();
+    if(!newData.period) newData.period = 'Uploaded ' + today();
+
+    // Extract available dates for the date-range picker
+    const H=parsed.H;
+    const dates=parsed.rows.map(r=>r[H.LEAD_ORIG]||'').filter(Boolean)
+      .map(s=>s.slice(0,10))
+      .filter(s=>/^\d{2}\/\d{2}\/\d{4}/.test(s)||/^\d{4}-\d{2}-\d{2}/.test(s))
+      .map(s=>{
+        if(s.includes('/')){const [m,day,y]=s.split('/');return y+'-'+m.padStart(2,'0')+'-'+day.padStart(2,'0');}
+        return s.slice(0,10);
+      });
+    if(dates.length) newData._rawDates=[...new Set(dates)].sort();
+
+    // Snapshot previous data to history before overwriting
+    if(ex&&ex.reps&&ex.reps.length>0){
+      pushHist(ulTarget,{
+        date:today(),period:ex.period,source:ex._sourceFile||'',
+        total_leads:ex.totals?.total_leads,
+        delivered:ex.totals?.delivered,
+        avg_conv:ex.totals?.avg_conv,
+        top_rep:ex.reps?.[0]?.name,
+        top_score:ex.reps?.[0]?.composite,
+        reps:ex.reps
+      });
+    }
+    setStoreData(ulTarget,newData);   // stripPII() inside, drops any leaked _masterText
+    // v4.3.4: persist PII-stripped rows so date-range filtering works
+    // across page reloads even when the in-memory raw CSV is gone.
+    setFilterRows(ulTarget, parsed, fileName);
+    closeOv('ov-upload');buildRail();
+    activeDR='mtd';drFrom='';drTo='';
+    if(curStore===ulTarget) buildPage();
+    const _s=STORES.find(s=>s.id===ulTarget);
+    const _toastMsg = (_s&&_s.isAirstream)
+      ? '\u2713 Airstream brand updated. Non-Airstream rows filtered out; 700 Credit removed.'
+      : '\u2713 '+(_s?_s.name:ulTarget)+' updated. 700 Credit + Airstream removed.';
+    toast(_toastMsg,'grn');
+
+    if(BACKEND_URL){syncToBackend(masterText,ulTarget,fileName,newData,getFilterRows(ulTarget));}
+  }catch(e){
+    console.error(e);
+    toast('Error: '+e.message,'red');
+  }
+  btn.disabled=false;btn.textContent='Process & Update Scores';pending=[];
+}
+
+/* ══ BACKEND SYNC ════════════════════════════════════════════ */
+function syncToBackend(masterText,storeId,origName,computed,filterRows){
+  const now=new Date();
+  const dd=String(now.getDate()).padStart(2,'0');
+  const mm=String(now.getMonth()+1).padStart(2,'0');
+  const yy=String(now.getFullYear()).slice(2);
+  const storeAlias=storeId.replace(/_/g,'');
+
+  const fd=new FormData();
+  const blob=new Blob([masterText],{type:'text/csv'});
+  /* v4.3.2 (May 2026) — Always synthesize the filename from the target
+     storeId. The previous behavior preserved origName when it matched
+     /master_leads/i, which silently routed data to the wrong server
+     blob when the upload target differed from the filename. Concrete
+     failure: uploading "Hammond_master_leads_05_25_26.csv" to the
+     Airstream tab → backend parses "hammond" out of the filename and
+     overwrites store_hammond instead of writing store_airstream.
+
+     Filename now ALWAYS reflects the upload target. Original filename
+     is logged for traceability when it doesn't match. */
+  const fn=storeAlias+'_master_leads_'+dd+'_'+mm+'_'+yy+'.csv';
+  if(origName && origName.toLowerCase().indexOf(storeAlias)!==0){
+    console.warn('GARV: filename "'+origName+'" does not match upload target "'+storeId+'". Uploading as "'+fn+'".');
+  }
+  fd.append('files',blob,fn);
+
+  /* v4.3.3 (May 2026) — Also send the client-computed scores. The server
+     stores them alongside the raw CSV so that on hydration it can return
+     ONLY the scores (not the raw CSV with customer PII). The raw CSV
+     stays server-side, recoverable for future server-side re-scoring,
+     but never re-exposed via the public store-data GET endpoint. */
+  if(computed){
+    // Strip any in-memory PII before send (defensive \u2014 should already
+    // be clean since the data object never carried _masterText).
+    const safe = stripPII(computed);
+    fd.append('computed', new Blob([JSON.stringify(safe)], {type:'application/json'}), 'computed.json');
+  }
+
+  /* v4.4.0 (May 2026) — Also send the PII-stripped row cache so other
+     browsers can pull it on hydration and have date-range filtering
+     available immediately. Cache is already PII-stripped by
+     setFilterRows() via sanitizeRow() before this point — the server
+     also re-strips on receipt as defense in depth. Skipping the send
+     is safe (legacy clients pre-v4.4.0 behavior); the only consequence
+     is other browsers won't have cross-browser date-range filtering. */
+  if(filterRows && Array.isArray(filterRows.rows) && filterRows.H){
+    try {
+      fd.append('filterRows',
+        new Blob([JSON.stringify(filterRows)], {type:'application/json'}),
+        'filterRows.json');
+    } catch(e) {
+      console.warn('GARV: filterRows serialize failed, continuing without cross-browser cache', e);
+    }
+  }
+
+  fetch(BACKEND_URL+'/api/upload',{method:'POST',body:fd})
+    .then(r=>r.json())
+    .then(data=>{
+      if(data.results&&data.results.some(r=>r.status==='success')){
+        console.log('GARV: Data synced to server',data.results);
+      } else {
+        console.warn('GARV: Backend sync issue',data);
+      }
+    })
+    .catch(err=>console.warn('GARV: Backend sync failed (data saved locally)',err));
+}
+
+/* ══ AI ══════════════════════════════════════════════════════ */
+/* v4.3.7 — aiCtx() now respects the active date filter.
+   Before: aiCtx pulled getStoreData(id) directly, which is the cached
+   all-data record. With MTD/Last 30/Last 7/custom active, the user saw
+   filtered scores on screen but the AI received all-data scores — so
+   coaching answers misaligned with the visible numbers. Classic
+   silent drift.
+
+   Now: when a filter is active, run the same re-score pipeline that
+   buildSec() uses (in-session raw CSV → persisted PII-stripped row
+   cache → fall back to cached). Hand the AI the SAME numbers the
+   user sees, plus an explicit period label and the prior-period
+   delivery count so the AI can correctly explain split-date effects.
+
+   Network tab quirk preserved: when curStore==='network', aiCtx picks
+   the first live store (same as before). The date filter then applies
+   to that store's data via the same re-score path. */
+function aiCtx(){
+  const id = curStore === 'network'
+    ? (STORES.find(s => !!lsGet('d_'+s.id))?.id || STORES[0].id)
+    : curStore;
+  const s = STORES.find(x => x.id === id) || { name: 'this location' };
+
+  // Mirror buildSec's data-source priority. The Network tab does NOT
+  // scope the Airstream brand view, but if the AI is being asked about
+  // Airstream specifically (curStore === 'airstream'), the filter is
+  // legitimately active on that tab and we should respect it.
+  let d = getStoreData(id) || {};
+  const filterActive = (activeDR !== 'all' || drFrom || drTo);
+  const isNetworkScopingAirstream = (curStore === 'network' && s.isAirstream);
+  if(filterActive && d.reps && !isNetworkScopingAirstream){
+    const rawCSV = getRawCSV(id);
+    let filtered = null;
+    if(rawCSV){
+      filtered = recomputeFiltered(rawCSV, getEffectiveDateFrom(), getEffectiveDateTo(), id);
+    } else {
+      const cache = getFilterRows(id);
+      if(cache && cache.rows && cache.H){
+        filtered = recomputeFilteredFromRows(cache.rows, cache.H, getEffectiveDateFrom(), getEffectiveDateTo(), id);
+      }
+    }
+    if(filtered && filtered.reps && filtered.reps.length) d = filtered;
+  }
+  const reps = d.reps || [];
+
+  // Period label — what window is the AI actually analyzing? When a
+  // filter is active and we successfully re-scored, use the explicit
+  // window ("Month to Date · 5/3 – 5/27" — clamped to the actual
+  // loaded data range). Otherwise fall back to the upload-date period
+  // from the cached record.
+  const periodLabel = filterActive
+    ? buildPeriodLabel({ fallback: d.period || 'Recent', dataRange: getAvailableDateRange(d) })
+    : (d.period || 'Recent');
+
+  const intro = s.isAirstream
+    ? 'You are a dealership sales performance coach for Great American RV SuperStores, analyzing the Airstream brand pipeline ACROSS ALL ROOFTOPS (including the Airstream of GARV rooftop). Reps shown here may also appear on their home rooftop scorecard with a different score \u2014 the denominator here is Airstream leads only.'
+    : 'You are a dealership sales performance coach for Great American RV SuperStores, '+s.name+'.';
+  const filtersLine = s.isAirstream
+    ? 'Period: '+periodLabel+'. Filters: only Airstream Make is kept; 700 Credit removed; managers excluded.'
+    : 'Period: '+periodLabel+'. Filters: 700 Credit and Airstream leads removed; managers excluded.';
+
+  // Split-date context — when a filter is active and some deliveries
+  // came from pre-period leads, give the AI the breakdown so it can
+  // explain conversion-rate movement correctly. Without this the AI
+  // tends to interpret "leads dropped but deliveries held" as
+  // performance improvement, when often it's just out-of-window leads
+  // closing in-window (a structural effect, not a coaching insight).
+  const priorDel = (d.totals && d.totals.prior_period_deliveries) || 0;
+  const totalDel = (d.totals && d.totals.delivered) || 0;
+  const splitNote = (filterActive && priorDel > 0)
+    ? '\nNOTE ON THE PERIOD: '+priorDel+' of '+totalDel+' deliveries shown came from leads that originated BEFORE this window. They count as in-period deliveries because their sale date (Lead Last Modified Date) falls in the window, but they are not in-period leads. This is why conversion rate can rise even when lead volume drops with a tighter window. Do not interpret a flat delivery count with a drop in leads as performance improvement unless you have first considered this split-date effect.'
+    : '';
+
+  return intro+'\n'+
+    filtersLine+'\n'+
+    'Speed is scored on INTERNET leads only using the Adjusted Response Time. Walk-in/phone leads are zero by definition and not penalized.'+
+    splitNote+'\n'+
+    'SCORECARD:\n'+
+    reps.map(r=>r.pos+'. '+r.name+' | Score:'+r.composite+' | Conv:'+(r.conv_rate*100).toFixed(1)+'% | Del:'+r.delivered+' | InternetLeads:'+r.internet_leads+' | MedResp:'+(r.med_adj===null?'n/a':r.med_adj+'m')+' | Contact:'+(r.contact_disc*100).toFixed(0)+'% | Visits:'+r.visits+' | WriteUpRate:'+(r.writeup_rate*100).toFixed(0)+'% | Lineup:'+r.lineup).join('\n')+
+    '\nGive specific, actionable coaching grounded in this data. Reference rep names and numbers. Under 320 words. Clear paragraphs, not bullet walls.';
+}
+async function callAI(q,tEl,rEl){
+  if(!AI_PROXY){rEl.textContent='Set the AI_PROXY variable at the top of the script to enable live AI responses.';rEl.style.display='block';return}
+  tEl.style.display='flex';rEl.style.display='none';
+  try{
+    const res=await fetch(AI_PROXY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,system:aiCtx(),messages:[{role:'user',content:q}]})});
+    const data=await res.json();
+    rEl.textContent=data.content?.map(b=>b.text||'').join('')||'No response.';
+  }catch(e){rEl.textContent='Could not reach AI proxy. Check your proxy URL configuration.'}
+  tEl.style.display='none';rEl.style.display='block';
+}
+function runInline(){const q=document.getElementById('il-inp')?.value?.trim();if(q)callAI(q,document.getElementById('il-think'),document.getElementById('il-res'))}
+function runAIModal(){const q=document.getElementById('ai-modal-inp')?.value?.trim();if(q)callAI(q,document.getElementById('ai-modal-think'),document.getElementById('ai-modal-res'))}
+function openAIModal(){document.getElementById('ai-modal-inp').value='';document.getElementById('ai-modal-think').style.display='none';document.getElementById('ai-modal-res').style.display='none';openOv('ov-ai')}
+
+/* ══ HISTORY ═════════════════════════════════════════════════ */
+function openHistory(){renderHistoryContent();openOv('ov-history')}
+function renderHistoryContent(){
+  const container=document.getElementById('hist-content');
+  if(!container)return;
+  const hasAny=STORES.some(s=>getHist(s.id).length>0);
+  if(!hasAny){
+    container.innerHTML='<div style="text-align:center;color:var(--t3);padding:28px;font-size:12px">No upload history yet. Upload weekly to build trend data and unlock week-over-week comparisons.</div>';
+    return;
+  }
+  let html='<table class="ht" style="width:100%"><thead><tr>'+
+    '<th>Store</th><th>Upload</th><th>Date</th>'+
+    '<th class="r">Leads</th><th class="r">Delivered</th><th class="r">Conv%</th>'+
+    '<th>Top Rep</th><th class="r">Score</th><th style="text-align:center">Remove</th>'+
+    '</tr></thead><tbody id="hist-tbody-inner"></tbody></table>';
+  container.innerHTML=html;
+  renderHistoryRows();
+}
+function renderHistoryRows(){
+  const tbody=document.getElementById('hist-tbody-inner');
+  if(!tbody)return;
+  let rows=[];
+  STORES.forEach(s=>{
+    getHist(s.id).forEach((h,i)=>rows.push({storeId:s.id,sn:s.name,cur:i===0,idx:i,...h}));
+  });
+  rows.sort((a,b)=>new Date(b.date||0)-new Date(a.date||0));
+  if(rows.length===0){
+    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:20px">No history yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML=rows.map(h=>'<tr>'+
+    '<td style="font-family:var(--font);font-size:12px;color:var(--t0)">'+h.sn+'</td>'+
+    '<td><span class="wb '+(h.cur?'wb-c':'wb-p')+'">'+(h.cur?'Current':'Prev')+'</span></td>'+
+    '<td>'+(h.date||'\u2014')+'</td>'+
+    '<td class="r" style="color:var(--t1)">'+(h.total_leads||0).toLocaleString()+'</td>'+
+    '<td class="r">'+(h.delivered||'\u2014')+'</td>'+
+    '<td class="r" style="color:var(--grn)">'+(h.avg_conv?pct(h.avg_conv):'\u2014')+'</td>'+
+    '<td style="font-family:var(--font);color:var(--t1)">'+(h.top_rep||'\u2014')+'</td>'+
+    '<td class="r"><span style="font-family:var(--disp);font-size:15px;color:var(--gold)">'+(h.top_score?.toFixed(1)||'\u2014')+'</span></td>'+
+    '<td style="text-align:center">'+
+      '<button class="hist-row-del" title="Remove this upload" onclick="deleteHistRow(\''+h.storeId+'\','+h.idx+')">&#128465;</button>'+
+    '</td>'+
+  '</tr>').join('');
+  const storeSection=document.createElement('div');
+  storeSection.style.cssText='margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center';
+  storeSection.innerHTML='<span style="font-size:10px;color:var(--t3);letter-spacing:.8px;text-transform:uppercase">Clear history:</span>'+
+    STORES.filter(s=>getHist(s.id).length>0).map(s=>
+      '<button class="btn-clear-store" onclick="clearStoreHistory(\''+s.id+'\')">'+s.name+' ('+getHist(s.id).length+')</button>'
+    ).join('');
+  document.getElementById('hist-content').appendChild(storeSection);
+  const resetSection=document.createElement('div');
+  resetSection.style.cssText='margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center';
+  resetSection.innerHTML='<span style="font-size:10px;color:var(--t3);letter-spacing:.8px;text-transform:uppercase">Reset store (all data):</span>'+
+    STORES.map(s=>{
+      const hasData=getHist(s.id).length>0||lsGet('d_'+s.id);
+      return '<button class="btn-clear-store" style="'+(hasData?'border-color:var(--red);color:var(--red)':'')+'" onclick="clearStoreData(\''+s.id+'\')">'+s.name+'</button>';
+    }).join('');
+  document.getElementById('hist-content').appendChild(resetSection);
+}
+function deleteHistRow(storeId,idx){
+  const h=getHist(storeId);
+  if(idx<0||idx>=h.length)return;
+  if(!confirm('Remove this upload entry from history?'))return;
+  h.splice(idx,1);lsSet('h_'+storeId,h);
+  renderHistoryContent();toast('Upload entry removed.','gold');
+}
+function clearStoreHistory(storeId){
+  const s=STORES.find(x=>x.id===storeId);
+  if(!confirm('Clear all history for '+s.name+'? Current score data is kept — only the history log is removed.'))return;
+  lsSet('h_'+storeId,[]);lsSet('hist_cleared_'+storeId,true);
+  renderHistoryContent();toast(s.name+' history cleared. Scores and current data preserved.','gold');
+}
+async function clearStoreData(storeId){
+  const s=STORES.find(x=>x.id===storeId);
+  if(!confirm('⚠️ Reset '+s.name+' to fresh state?\n\nThis will delete ALL scores, history, and raw files for this store from the server and this browser.\n\nThis cannot be undone.'))return;
+  try{
+    if(BACKEND_URL) await fetch(BACKEND_URL+'/api/store/'+storeId,{method:'DELETE'}).catch(()=>{});
+    lsSet('d_'+storeId,null);lsSet('h_'+storeId,[]);lsSet('hist_cleared_'+storeId,true);
+    clearFilterRows(storeId);  // v4.3.4
+    renderHistoryContent();buildRail();
+    if(curStore===storeId) goStore('network'); else buildPage();
+    toast(s.name+' reset to fresh state.','gold');
+  }catch(e){toast('Failed to reset '+s.name+': '+e.message,'red')}
+}
+function clearAllHistory(){
+  if(!confirm('Clear all upload history for all stores? Current score data is preserved — only the history log is removed.'))return;
+  STORES.forEach(s=>{lsSet('h_'+s.id,[]);lsSet('hist_cleared_'+s.id,true)});
+  renderHistoryContent();toast('All history cleared. Current store data preserved.','gold');
+}
+async function clearAllBlobData(){
+  if(!confirm('⚠️ This will permanently delete ALL server history data for all stores from Netlify Blobs.\n\nScore data will also be cleared from this browser.\n\nThis cannot be undone. Are you sure?'))return;
+  try{
+    if(BACKEND_URL) await Promise.all(STORES.map(s=>fetch(BACKEND_URL+'/api/store/'+s.id,{method:'DELETE'}).catch(()=>{})));
+    STORES.forEach(s=>{lsSet('h_'+s.id,[]);lsSet('hist_cleared_'+s.id,true);lsSet('d_'+s.id,null);clearFilterRows(s.id);});
+    renderHistoryContent();buildRail();goStore('network');
+    toast('All server and local data cleared.','gold');
+  }catch(e){toast('Failed to clear server data: '+e.message,'red')}
+}
+
+/* ══ LOCAL-CACHE ACTIONS (v4.3.9) ═══════════════════════════════
+   Non-destructive helpers for users who want to (a) confirm they're
+   seeing the latest server state, or (b) reset their browser cache
+   without touching server data. Common support flow: "try Refresh
+   first; if you still see something stale, Clear Local Cache."
+
+   Neither action deletes server data. Both are safe to run any time.
+═══════════════════════════════════════════════════════════════ */
+
+/* Re-runs the same bootHydrate() pipeline the page uses on load.
+   Server response wins on timestamp, so any stale local data gets
+   overwritten with current server state. Shows a brief sync badge
+   so the user knows something is happening. */
+async function refreshFromServer(){
+  if(!BACKEND_URL){
+    toast('No backend configured — nothing to refresh from.','gold');
+    return;
+  }
+  closeOv('ov-history');
+  showSyncBadge(true);
+  // Re-fetch every store's data + history + row cache in parallel and
+  // re-apply through the same comparators used at boot. We don't
+  // re-show the full boot overlay because the user is already
+  // mid-session and a full-screen blackout would be jarring; the
+  // topbar sync badge is enough signal.
+  // v4.4.0 — also re-pulls rows_<id> so a manual refresh updates the
+  // PII-stripped row cache used for cross-browser date filtering.
+  try{
+    const dataPromises = STORES.map(s =>
+      fetch(BACKEND_URL+'/api/store/'+s.id)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => ({ storeId: s.id, data }))
+        .catch(() => ({ storeId: s.id, data: null }))
+    );
+    const histPromises = STORES.map(s =>
+      fetch(BACKEND_URL+'/api/store/'+s.id+'/history')
+        .then(r => r.ok ? r.json() : null)
+        .then(hist => ({ storeId: s.id, hist }))
+        .catch(() => ({ storeId: s.id, hist: null }))
+    );
+    const rowsPromises = STORES.map(s =>
+      fetch(BACKEND_URL+'/api/store/'+s.id+'/rows')
+        .then(r => r.ok ? r.json() : null)
+        .then(rows => ({ storeId: s.id, rows }))
+        .catch(() => ({ storeId: s.id, rows: null }))
+    );
+    const results = await Promise.allSettled([...dataPromises, ...histPromises, ...rowsPromises]);
+    let applied = 0;
+    for(const r of results){
+      if(r.status !== 'fulfilled' || !r.value) continue;
+      const v = r.value;
+      if('data' in v && applyHydratedStore(v.storeId, v.data)) applied++;
+      if('hist' in v) applyHydratedHistory(v.storeId, v.hist);
+      if('rows' in v) applyHydratedRows(v.storeId, v.rows);
+    }
+    buildRail();
+    buildPage();
+    toast('Refreshed from server. '+applied+' store record(s) updated.','grn');
+  } catch(e){
+    toast('Refresh failed: '+e.message,'red');
+  } finally {
+    showSyncBadge(false);
+  }
+}
+
+/* Wipes every garv7_ key from this browser's localStorage and reloads
+   the page. Server data is untouched and will re-hydrate on reload
+   through the normal boot path. We restrict the sweep to the garv7_
+   prefix so we don't nuke unrelated localStorage from other apps
+   that may share this origin (defensive — claude.ai-hosted dev
+   versions could share scope).
+   In-session raw CSV in _masterCache dies with the page reload
+   automatically, so users will lose date-range filtering until
+   their next upload. We warn about this in the confirm. */
+function clearLocalCacheOnly(){
+  const msg = 'Clear this browser\'s local cache and reload?\n\n'+
+    '• Server data is NOT touched.\n'+
+    '• Scores will re-load from the server on refresh.\n'+
+    '• Any in-session uploaded CSV will be dropped — date-range filtering will be disabled until you re-upload.\n\n'+
+    'Other browsers / devices are unaffected.';
+  if(!confirm(msg)) return;
+  try{
+    // Sweep all garv7_ keys. Build the kill list first so we don't
+    // mutate the iteration target.
+    const toDelete = [];
+    for(let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      if(k && k.indexOf('garv7_') === 0) toDelete.push(k);
+    }
+    toDelete.forEach(k => localStorage.removeItem(k));
+  } catch(e){
+    // Storage access could fail in private-mode windows; fall through
+    // to reload anyway since the cache is effectively empty there.
+    console.warn('GARV: localStorage sweep failed', e);
+  }
+  // Reload so the page re-runs bootHydrate against a clean cache.
+  location.reload();
+}
+
+/* ══ OVERLAYS + TOAST ════════════════════════════════════════ */
+function openOv(id){document.getElementById(id).classList.add('open')}
+function closeOv(id){document.getElementById(id).classList.remove('open')}
+function toast(msg,type='gold'){
+  const c={gold:'var(--gold)',grn:'var(--grn)',red:'var(--red)'}[type]||'var(--gold)';
+  const t=document.createElement('div');
+  t.className='toast';t.style.borderColor=c;t.textContent=msg;
+  document.body.appendChild(t);setTimeout(()=>t.remove(),4500);
+}
+
+/* ══ INIT ════════════════════════════════════════════════════
+   v4.3.5 — GATED HYDRATION (no-flicker, server-wins)
+   ─────────────────────────────────────────────────────────────
+   Problem we're solving:
+     Before v4.3.5 the dashboard painted from localStorage
+     immediately on page load, then *maybe* corrected itself when
+     async server fetches resolved ~200-800ms later. Two failure
+     modes resulted:
+       (1) FLASH — users saw stale numbers for a fraction of a
+           second, then the page snapped to the new numbers.
+       (2) DRIFT — the local-wins-if-present hydration rule meant
+           a browser that had cached scores under an older code
+           version never picked up the newer server scores, so
+           Chrome and Edge could show different numbers for the
+           same store indefinitely.
+
+   Fix:
+     - Page boots in #boot overlay. #page and store tabs are
+       visibility:hidden via body.booting class. NOTHING from
+       localStorage paints until hydration settles.
+     - All store-data and history fetches run in parallel.
+     - Promise.allSettled waits for every fetch to resolve
+       (success or failure).
+     - Server response wins when its uploadedAt is newer than
+       (or equal to, +/- skew tolerance) the local one.
+     - Only after all stores have hydrated do we call
+       buildRail() + buildPage() and remove .booting.
+     - 4-second safety timeout: if the network is dead, we fall
+       back to localStorage rather than holding the loader
+       forever.
+
+   Net effect:
+     - Same numbers in every browser, every time, on every load.
+     - Single atomic paint — no flicker.
+     - Offline / network-failure fallback still works.
+═══════════════════════════════════════════════════════════════ */
+
+const HYDRATION_TIMEOUT_MS = 4000;
+// Tiny clock-skew tolerance so a server with a slightly different
+// wall clock doesn't lose to a stale local timestamp on the same
+// upload. 30 seconds is generous; uploads are minutes-to-weeks
+// apart so this can't accidentally let stale local win.
+const TIMESTAMP_SKEW_TOLERANCE_MS = 30_000;
+
+function revealApp(){
+  buildRail();
+  buildPage();
+  document.body.classList.remove('booting');
+  const boot = document.getElementById('boot');
+  if(boot){
+    boot.classList.add('boot-done');
+    // Remove from DOM after the fade so it can't trap clicks.
+    setTimeout(()=>boot.remove(), 350);
+  }
+}
+
+function showSyncBadge(on){
+  const b = document.getElementById('sync-badge');
+  if(b) b.classList.toggle('on', !!on);
+}
+
+function applyHydratedStore(storeId, serverData){
+  if(!serverData) return false;
+
+  // Legacy path: server returned raw CSV. Recompute client-side.
+  // Kept for transition compatibility; new servers don't do this.
+  if(serverData._masterText){
+    try{
+      const parsed = parseMasterCSV(serverData._masterText);
+      if(parsed && looksLikeMasterCSV(parsed)){
+        const fresh = recompute(parsed.rows, parsed.H, storeId, '', '');
+        fresh.period = serverData.period || fresh.period;
+        fresh.fileName = serverData.fileName;
+        fresh.uploadedAt = serverData.uploadedAt || new Date().toISOString();
+        setRawCSV(storeId, serverData._masterText);
+        setStoreData(storeId, fresh);
+        return true;
+      }
+    }catch(e){
+      console.warn('GARV: Legacy hydration rescore failed for '+storeId, e);
+    }
+  }
+
+  // Normal path: server has precomputed scores.
+  if(!serverData.reps || !serverData.reps.length) return false;
+
+  const local = lsGet('d_'+storeId);
+  const serverTs = Date.parse(serverData.uploadedAt || '') || 0;
+  const localTs  = Date.parse(local?.uploadedAt || '') || 0;
+
+  // Server wins unless local is meaningfully newer than server
+  // (more than skew tolerance). This is the change that ends
+  // cross-browser drift: every browser will converge on whatever
+  // store_<id> currently contains on the server.
+  const serverWins = !local
+                  || !local.reps?.length
+                  || serverTs >= (localTs - TIMESTAMP_SKEW_TOLERANCE_MS);
+
+  if(serverWins){
+    setStoreData(storeId, serverData);  // stripPII() defensively inside
+    return true;
+  }
+  return false;
+}
+
+function applyHydratedHistory(storeId, hist){
+  if(!Array.isArray(hist) || !hist.length) return false;
+  const localHist = getHist(storeId);
+  const serverTopTs = hist[0]?.uploadedAt ? Date.parse(hist[0].uploadedAt) : 0;
+  const localTopTs  = localHist[0]?.uploadedAt ? Date.parse(localHist[0].uploadedAt) : 0;
+  // Replace local history when server's top entry is newer, or when
+  // local has nothing. Otherwise keep local (it may contain entries
+  // the user added then later cleared on the server side, etc.).
+  if(!localHist.length || serverTopTs > localTopTs){
+    lsSet('h_'+storeId, hist);
+    return true;
+  }
+  return false;
+}
+
+/* v4.4.0 — Apply the PII-stripped row cache fetched from
+   /api/store/:id/rows. Same server-wins-on-timestamp comparator as
+   applyHydratedStore — if the server's cache is newer (or equal,
+   within skew tolerance), or local has none, overwrite local. This
+   is what makes date-range filtering work cross-browser: Edge can
+   pull what Chrome uploaded and immediately have rows to re-score
+   against. */
+function applyHydratedRows(storeId, serverRows){
+  if(!serverRows || !Array.isArray(serverRows.rows) || !serverRows.H) return false;
+  const local = getFilterRows(storeId);
+  const serverTs = Date.parse(serverRows.uploadedAt || '') || 0;
+  const localTs  = Date.parse(local?.uploadedAt || '') || 0;
+  const serverWins = !local
+                  || !Array.isArray(local.rows)
+                  || serverTs >= (localTs - TIMESTAMP_SKEW_TOLERANCE_MS);
+  if(serverWins){
+    lsSet('rs_'+storeId, serverRows);
+    return true;
+  }
+  return false;
+}
+
+async function bootHydrate(){
+  // No backend configured (e.g. running index.html from disk) —
+  // just paint from localStorage and reveal.
+  if(!BACKEND_URL){
+    revealApp();
+    return;
+  }
+
+  // Kick off all fetches in parallel. We don't paint per-fetch;
+  // we wait for the whole batch.
+  const dataPromises = STORES.map(s =>
+    fetch(BACKEND_URL+'/api/store/'+s.id)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => ({ storeId: s.id, data }))
+      .catch(() => ({ storeId: s.id, data: null }))
+  );
+  const histPromises = STORES.map(s =>
+    fetch(BACKEND_URL+'/api/store/'+s.id+'/history')
+      .then(r => r.ok ? r.json() : null)
+      .then(hist => ({ storeId: s.id, hist }))
+      .catch(() => ({ storeId: s.id, hist: null }))
+  );
+  // v4.4.0 — also pull the PII-stripped row cache for each store.
+  // 404 is expected for stores that have never been uploaded with a
+  // v4.4.0+ client (server has no rows_<id> blob); we treat that as
+  // "no rows" and skip it. Once that store is re-uploaded, future
+  // hydrations will pick it up.
+  const rowsPromises = STORES.map(s =>
+    fetch(BACKEND_URL+'/api/store/'+s.id+'/rows')
+      .then(r => r.ok ? r.json() : null)
+      .then(rows => ({ storeId: s.id, rows }))
+      .catch(() => ({ storeId: s.id, rows: null }))
+  );
+
+  // Race the full batch against the safety timeout. If the network
+  // is dead or slow, we'd rather show stale local than hang.
+  const allSettled = Promise.allSettled([...dataPromises, ...histPromises, ...rowsPromises]);
+  const timeout = new Promise(resolve => setTimeout(resolve, HYDRATION_TIMEOUT_MS));
+  const winner = await Promise.race([allSettled, timeout]);
+
+  // If timeout won, allSettled is still pending — that's fine, the
+  // resolved promises will still apply when they arrive later (see
+  // late-arrival handler below). We just stop blocking the reveal.
+  if(winner === undefined){
+    console.warn('GARV: Hydration timed out after '+HYDRATION_TIMEOUT_MS+'ms; falling back to local cache. Late arrivals will refresh in-place.');
+    // Set up a late-arrival handler so if the slow fetches DO come
+    // back, they still get applied — just with a visible sync badge.
+    showSyncBadge(true);
+    Promise.allSettled([...dataPromises, ...histPromises, ...rowsPromises]).then(results => {
+      let anyApplied = false;
+      for(const r of results){
+        if(r.status !== 'fulfilled' || !r.value) continue;
+        const v = r.value;
+        if('data' in v && applyHydratedStore(v.storeId, v.data)) anyApplied = true;
+        if('hist' in v && applyHydratedHistory(v.storeId, v.hist)) anyApplied = true;
+        if('rows' in v && applyHydratedRows(v.storeId, v.rows)) anyApplied = true;
+      }
+      if(anyApplied){
+        buildRail();
+        buildPage();
+      }
+      showSyncBadge(false);
+    });
+    revealApp();
+    return;
+  }
+
+  // Normal path: every fetch resolved within the timeout. Apply
+  // them all, then paint once.
+  for(const r of winner){
+    if(r.status !== 'fulfilled' || !r.value) continue;
+    const v = r.value;
+    if('data' in v) applyHydratedStore(v.storeId, v.data);
+    if('hist' in v) applyHydratedHistory(v.storeId, v.hist);
+    if('rows' in v) applyHydratedRows(v.storeId, v.rows);
+  }
+  revealApp();
+}
+
+bootHydrate();
+
+</script>
+</body>
+</html>

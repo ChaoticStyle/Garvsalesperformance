@@ -1,0 +1,8 @@
+{
+  "name": "garv-dashboard-functions",
+  "version": "1.0.0",
+  "description": "Netlify functions for GARV Sales Performance Dashboard",
+  "dependencies": {
+    "@netlify/blobs": "^8.2.0"
+  }
+}

@@ -1,0 +1,55 @@
+[build]
+  command   = "echo 'No build step required'"
+  publish   = "public"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+# ─── API routes ─────────────────────────────────────────────
+[[redirects]]
+  from   = "/api/upload"
+  to     = "/.netlify/functions/upload"
+  status = 200
+
+[[redirects]]
+  from   = "/api/store/:storeId/history/:index"
+  to     = "/.netlify/functions/store-history"
+  status = 200
+
+[[redirects]]
+  from   = "/api/store/:storeId/history"
+  to     = "/.netlify/functions/store-history"
+  status = 200
+
+# v4.4.0 — Row cache endpoint. MUST come before /api/store/:storeId
+# below, since Netlify processes redirects in file order and the
+# bare pattern would otherwise swallow this one.
+[[redirects]]
+  from   = "/api/store/:storeId/rows"
+  to     = "/.netlify/functions/store-rows"
+  status = 200
+
+[[redirects]]
+  from   = "/api/store/:storeId"
+  to     = "/.netlify/functions/store-data"
+  status = 200
+
+[[redirects]]
+  from   = "/api/ai"
+  to     = "/.netlify/functions/ai-proxy"
+  status = 200
+
+# ─── CORS headers on all /api/* ─────────────────────────────
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Access-Control-Allow-Origin  = "*"
+    Access-Control-Allow-Methods = "GET, POST, DELETE, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
+
+# ─── SPA fallback ───────────────────────────────────────────
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
