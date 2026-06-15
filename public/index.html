@@ -2873,7 +2873,7 @@ async function callAI(q,tEl,rEl){
   if(!AI_PROXY){rEl.textContent='Set the AI_PROXY variable at the top of the script to enable live AI responses.';rEl.style.display='block';return}
   tEl.style.display='flex';rEl.style.display='none';
   try{
-    const res=await fetch(AI_PROXY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,system:aiCtx(),messages:[{role:'user',content:q}]})});
+    const res=await fetch(AI_PROXY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:600,system:aiCtx(),messages:[{role:'user',content:q}]})});
     const data=await res.json();
     rEl.textContent=data.content?.map(b=>b.text||'').join('')||'No response.';
   }catch(e){rEl.textContent='Could not reach AI proxy. Check your proxy URL configuration.'}
