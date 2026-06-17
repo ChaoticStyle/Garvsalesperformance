@@ -115,16 +115,28 @@ function dedupCustomers(rows, H){
   const groups = {};
   for (let i = 0; i < n; i++){ const k=find(i); (groups[k]=groups[k]||[]).push(i); }
 
+  // Sub-group by unit (VIN → Stock Number → fallback) so a customer who bought
+  // two different units gets a winner row for each; true duplicate leads for the
+  // same unit still collapse to one.
   const winners = [];
   for (const k in groups){
     const idxs = groups[k];
     if (idxs.length===1){ winners.push(rows[idxs[0]]); continue; }
-    let best=idxs[0], bestSold=isDelivered(rows[best],H), bestTs=Date.parse(rows[best][H.LEAD_ORIG]||'')||0;
-    for (let j=1; j<idxs.length; j++){
-      const i=idxs[j], sold=isDelivered(rows[i],H), ts=Date.parse(rows[i][H.LEAD_ORIG]||'')||0;
-      if ((sold&&!bestSold)||(sold===bestSold&&ts>bestTs)){ best=i; bestSold=sold; bestTs=ts; }
+    const byUnit = {};
+    for (const i of idxs){
+      const vin   = (rows[i][H.VIN]      || '').trim().toUpperCase();
+      const stock = (rows[i][H.STOCK_NUM] || '').trim().toUpperCase();
+      const unitKey = vin || stock || '__none__';
+      (byUnit[unitKey] = byUnit[unitKey] || []).push(i);
     }
-    winners.push(rows[best]);
+    for (const unitIdxs of Object.values(byUnit)){
+      let best=unitIdxs[0], bestSold=isDelivered(rows[best],H), bestTs=Date.parse(rows[best][H.LEAD_ORIG]||'')||0;
+      for (let j=1; j<unitIdxs.length; j++){
+        const i=unitIdxs[j], sold=isDelivered(rows[i],H), ts=Date.parse(rows[i][H.LEAD_ORIG]||'')||0;
+        if ((sold&&!bestSold)||(sold===bestSold&&ts>bestTs)){ best=i; bestSold=sold; bestTs=ts; }
+      }
+      winners.push(rows[best]);
+    }
   }
   return winners;
 }
@@ -188,6 +200,8 @@ export function parseMasterCSVv2(txt){
   H.DAY_PHONE       = H['Daytime Phone'];
   H.EVE_PHONE       = H['Evening Phone'];
   H.CELL_PHONE      = H['Cell Phone'];
+  H.VIN             = H['VIN'];
+  H.STOCK_NUM       = H['Stock Number'];
   H.VISIT_ID        = H['Showroom Visit ID'];
   H.ASSIGNED_USER   = H['Assigned User'];
   H.ASSIGNED_GROUP  = H['Assigned User - User Group'];
