@@ -12,6 +12,13 @@
   to     = "/.netlify/functions/upload"
   status = 200
 
+# Automated ingest endpoint — called by the Google Apps Script bot.
+# Accepts raw CSV + storeId as JSON, runs server-side scoring, writes blobs.
+[[redirects]]
+  from   = "/api/ingest"
+  to     = "/.netlify/functions/ingest"
+  status = 200
+
 [[redirects]]
   from   = "/api/store/:storeId/history/:index"
   to     = "/.netlify/functions/store-history"
