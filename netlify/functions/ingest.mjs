@@ -13,6 +13,7 @@ import {
   recompute,
   extractRawDates,
   sanitizeRows,
+  dedupCustomers,
 } from './lib/scoring.mjs';
 
 const CORS = {
@@ -113,7 +114,14 @@ export default async (request) => {
     });
 
     // 3. PII-stripped row cache (enables cross-browser date-range filtering)
-    const cleanRows = sanitizeRows(parsed.rows, parsed.H);
+    //    CRITICAL: dedup BEFORE stripping PII. dedupCustomers() keys on
+    //    Customer/Email/Phone — the exact columns sanitizeRows() blanks.
+    //    Stripping first would leave duplicate customer rows uncollapsed,
+    //    and the browser's date-filtered recompute (which re-runs dedup)
+    //    could no longer merge them, inflating leads AND deliveries. The
+    //    client's setFilterRows() already dedups-then-strips; this mirrors
+    //    it so ingest- and browser-fed stores produce identical numbers.
+    const cleanRows = sanitizeRows(dedupCustomers(parsed.rows, parsed.H), parsed.H);
     await blobStore.setJSON('rows_' + storeId, {
       rows:       cleanRows,
       H:          parsed.H,
