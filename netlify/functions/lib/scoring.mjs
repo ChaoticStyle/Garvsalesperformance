@@ -94,7 +94,7 @@ function normPhone(p){
 function normEmail(e){ const s = String(e||'').trim().toLowerCase(); return s.includes('@') ? s : ''; }
 function normCust(c) { return String(c||'').trim().toLowerCase().replace(/\s+/g,' '); }
 
-function dedupCustomers(rows, H){
+export function dedupCustomers(rows, H){
   const n = rows.length;
   const parent = new Array(n);
   for (let i = 0; i < n; i++) parent[i] = i;
