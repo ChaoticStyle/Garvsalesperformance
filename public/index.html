@@ -2081,6 +2081,7 @@ function parseMasterCSVv2(txt){
   H.TO_MANAGER_GROUP=H['TO Manager - User Group'];
   H.CREATED_BY_GROUP=H['Created By User - User Group'];
   H.COMPLETED_BY_GROUP=H['Completed By User - User Group'];
+  H.VISIT_START    = H['Visit Start Date'];
   H.VISIT_RESULT   = H['Visit Result'];
   H.WRITE_UP       = H['Write Up'];
   H.TRADE_APP      = H['Trade Appraisal'];
@@ -2372,6 +2373,16 @@ function recompute(rows,H,storeId,fromStr,toStr){
     if(!vid) return;
     const vr=(r[H.VISIT_RESULT]||'').trim();
     if(vr==='Deleted') return;
+    // v4.5: Window visits by Visit Start Date against the SAME date
+    // range as leads/deliveries. Before this, visit/write-up credit
+    // ignored the date filter entirely, so a filtered ranking mixed
+    // all-time floor presence (20% of composite) with windowed
+    // conversion. Fallback: if the visit has no parseable start date,
+    // keep it (mirrors the lead-date fallback — never silently drop a
+    // visit just because the date cell is blank).
+    const visitMs = Date.parse(r[H.VISIT_START]||'');
+    const inVisitPeriod = noFilter ? true : (isNaN(visitMs) ? true : inRange(visitMs));
+    if(!inVisitPeriod) return;
     // Manager guard — only the floor-rep group matters here.
     // Completed-by-group / created-by-group are NOT consulted: those
     // are always Manager / Reception by VinSolutions design.
