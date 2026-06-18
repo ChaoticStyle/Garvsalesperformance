@@ -209,6 +209,7 @@ export function parseMasterCSVv2(txt){
   H.TO_MANAGER_GROUP   = H['TO Manager - User Group'];
   H.CREATED_BY_GROUP   = H['Created By User - User Group'];
   H.COMPLETED_BY_GROUP = H['Completed By User - User Group'];
+  H.VISIT_START     = H['Visit Start Date'];
   H.VISIT_RESULT    = H['Visit Result'];
   H.WRITE_UP        = H['Write Up'];
   H.TRADE_APP       = H['Trade Appraisal'];
@@ -387,6 +388,12 @@ export function recompute(rows, H, storeId, fromStr, toStr){
   filtered.forEach(r => {
     const vid = (r[H.VISIT_ID]    ||'').trim(); if (!vid) return;
     const vr  = (r[H.VISIT_RESULT]||'').trim(); if (vr==='Deleted') return;
+    // v4.5: Window visits by Visit Start Date against the same date
+    // range as leads/deliveries. Blank/unparseable date → keep (mirrors
+    // the lead-date fallback). Keeps this in sync with index.html.
+    const visitMs = Date.parse(r[H.VISIT_START]||'');
+    const inVisitPeriod = noFilter ? true : (isNaN(visitMs) ? true : inRange(visitMs));
+    if (!inVisitPeriod) return;
     const ag  = (r[H.ASSIGNED_GROUP]||'').trim(); if (MGR_GROUPS.has(ag)) return;
     const rep = (r[H.SALES_REP]   ||'').trim(); if (!rep) return;
     const s = visitStats[rep] = visitStats[rep]||{visits:0,write_ups:0,trades:0,user_group:''};
