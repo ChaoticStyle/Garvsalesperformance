@@ -296,8 +296,14 @@ export function recompute(rows, H, storeId, fromStr, toStr){
   const dedup = dedupCustomers(filtered, H);
 
   // Step 3: period classification
-  const fromMs = fromStr ? new Date(fromStr).getTime() : null;
-  const toMs   = toStr   ? new Date(toStr).setHours(23,59,59,999) : null;
+  // Parse as local-time datetimes (no 'Z'/offset suffix), not date-only
+  // strings. Date-only strings ("2026-06-22") parse as UTC midnight per
+  // spec, then .setHours() mutates in local time — on a Central-time
+  // machine that silently lands toMs on the PREVIOUS local day's end of
+  // day, dropping the entire last day of a bounded range. Appending an
+  // explicit local time avoids the UTC round-trip entirely.
+  const fromMs = fromStr ? new Date(fromStr + 'T00:00:00.000').getTime() : null;
+  const toMs   = toStr   ? new Date(toStr   + 'T23:59:59.999').getTime() : null;
   const inRange = ms => {
     if (isNaN(ms)) return false;
     if (fromMs!==null && ms<fromMs) return false;
