@@ -239,7 +239,31 @@ export default async (request) => {
         const existing = await store.get(histKey, { type: 'json' });
         if (Array.isArray(existing)) hist = existing;
       } catch { /* ignore */ }
-      hist.unshift({ fileName: fn, uploadedAt: now.toISOString(), period: record.period });
+      // Match the rich shape the client builds locally on browser upload
+      // (see pushHist() in index.html) — the History modal renders date,
+      // total_leads, delivered, avg_conv, top_rep, top_score and shows
+      // dashes for anything missing. Only available when the client
+      // posted computed.json (the normal path); legacy clients without
+      // it fall back to the metadata-only entry as before.
+      const histEntry = {
+        fileName: fn, uploadedAt: now.toISOString(), period: record.period,
+        date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      };
+      if (computedJson && computedJson.reps) {
+        histEntry.total_leads = computedJson.totals?.total_leads;
+        histEntry.delivered   = computedJson.totals?.delivered;
+        histEntry.avg_conv    = computedJson.totals?.avg_conv;
+        histEntry.top_rep     = computedJson.reps?.[0]?.name;
+        histEntry.top_score   = computedJson.reps?.[0]?.composite;
+        // Full per-rep snapshot, mirroring pushHist() in index.html. Trend
+        // arrows on baseball cards read prev.reps to diff composites against
+        // the immediately previous upload — without this, hydrating from
+        // server history (fresh page load, another device) leaves prev.reps
+        // empty and arrows never render. No PII here — reps are computed
+        // aggregates, not raw rows.
+        histEntry.reps = computedJson.reps;
+      }
+      hist.unshift(histEntry);
       if (hist.length > 20) hist = hist.slice(0, 20);
       await store.setJSON(histKey, hist);
 
