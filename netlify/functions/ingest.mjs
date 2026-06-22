@@ -135,7 +135,27 @@ export default async (request) => {
       const existing = await blobStore.get('hist_' + storeId, { type: 'json' });
       if (Array.isArray(existing)) hist = existing;
     } catch { /* first upload for this store */ }
-    hist.unshift({ fileName: displayName, uploadedAt, period: scored.period });
+    // Match the rich shape the client builds locally on browser upload
+    // (see pushHist() in index.html) — the History modal renders date,
+    // total_leads, delivered, avg_conv, top_rep, top_score and shows
+    // dashes for anything missing. uploadedAt stays ISO (boot hydration
+    // compares it for freshness); date is the human-readable display form.
+    hist.unshift({
+      fileName: displayName, uploadedAt, period: scored.period,
+      date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      total_leads: scored.totals.total_leads,
+      delivered:   scored.totals.delivered,
+      avg_conv:    scored.totals.avg_conv,
+      top_rep:     scored.reps?.[0]?.name,
+      top_score:   scored.reps?.[0]?.composite,
+      // Full per-rep snapshot, mirroring pushHist() in index.html. Trend
+      // arrows on baseball cards read prev.reps to diff composites against
+      // the immediately previous upload — without this, hydrating from
+      // server history (any fresh page load, another device, or this
+      // automated ingest pipeline) leaves prev.reps empty and arrows never
+      // render. No PII here — reps are computed aggregates, not raw rows.
+      reps: scored.reps,
+    });
     if (hist.length > 20) hist = hist.slice(0, 20);
     await blobStore.setJSON('hist_' + storeId, hist);
 
