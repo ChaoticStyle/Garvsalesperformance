@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GARV Performance Dashboard v4.6.0</title>
+<title>GARV Performance Dashboard v4.7.1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -2213,8 +2213,15 @@ function recompute(rows,H,storeId,fromStr,toStr){
      (an in-period lead, an out-of-month sale that closed in-period),
      or both (an in-period lead that closed in-period).
   */
-  const fromMs = fromStr ? new Date(fromStr).getTime() : null;
-  const toMs   = toStr   ? new Date(toStr).setHours(23,59,59,999) : null;
+  // Parse as local-time datetimes (no 'Z'/offset suffix), not date-only
+  // strings. Date-only strings ("2026-06-22") parse as UTC midnight per
+  // spec, then .setHours() mutates in local time — on a Central-time
+  // machine that silently lands toMs on the PREVIOUS local day's end of
+  // day, dropping the entire last day of a bounded range. Appending an
+  // explicit local time avoids the UTC round-trip entirely. Keep this in
+  // sync with the server copy in netlify/functions/lib/scoring.mjs.
+  const fromMs = fromStr ? new Date(fromStr + 'T00:00:00.000').getTime() : null;
+  const toMs   = toStr   ? new Date(toStr   + 'T23:59:59.999').getTime() : null;
   const inRange = ms => {
     if (isNaN(ms)) return false;
     if (fromMs !== null && ms < fromMs) return false;
