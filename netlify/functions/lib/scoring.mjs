@@ -94,6 +94,17 @@ function normPhone(p){
 function normEmail(e){ const s = String(e||'').trim().toLowerCase(); return s.includes('@') ? s : ''; }
 function normCust(c) { return String(c||'').trim().toLowerCase().replace(/\s+/g,' '); }
 
+// One lead per customer (matched by name/email/phone), regardless of
+// VIN/Stock Number — matches "no sale → collapse to one record" and
+// "identical sold unit → one sale" by construction, since the winner
+// is a single row chosen per customer group (prefer Sold, then latest
+// Lead Origination Date).
+//
+// A customer with MORE than one Sold row for a genuinely different
+// unit (distinct VIN-or-Stock-Number) is credited an extra delivery
+// via `extraSales` — but that extra row is never added to the lead
+// list, so it can never inflate valid_leads/total_leads. Net result
+// for "customer buys 2 different units same day": 1 lead, 2 solds.
 export function dedupCustomers(rows, H){
   const n = rows.length;
   const parent = new Array(n);
@@ -115,30 +126,36 @@ export function dedupCustomers(rows, H){
   const groups = {};
   for (let i = 0; i < n; i++){ const k=find(i); (groups[k]=groups[k]||[]).push(i); }
 
-  // Sub-group by unit (VIN → Stock Number → fallback) so a customer who bought
-  // two different units gets a winner row for each; true duplicate leads for the
-  // same unit still collapse to one.
-  const winners = [];
+  const unitKeyOf = i => {
+    const vin   = (rows[i][H.VIN]       || '').trim().toUpperCase();
+    const stock = (rows[i][H.STOCK_NUM] || '').trim().toUpperCase();
+    return vin || stock || '';
+  };
+
+  const winners = [], extraSales = [];
   for (const k in groups){
     const idxs = groups[k];
-    if (idxs.length===1){ winners.push(rows[idxs[0]]); continue; }
-    const byUnit = {};
-    for (const i of idxs){
-      const vin   = (rows[i][H.VIN]      || '').trim().toUpperCase();
-      const stock = (rows[i][H.STOCK_NUM] || '').trim().toUpperCase();
-      const unitKey = vin || stock || '__none__';
-      (byUnit[unitKey] = byUnit[unitKey] || []).push(i);
+    let best=idxs[0], bestSold=isDelivered(rows[best],H), bestTs=Date.parse(rows[best][H.LEAD_ORIG]||'')||0;
+    for (let j=1; j<idxs.length; j++){
+      const i=idxs[j], sold=isDelivered(rows[i],H), ts=Date.parse(rows[i][H.LEAD_ORIG]||'')||0;
+      if ((sold&&!bestSold)||(sold===bestSold&&ts>bestTs)){ best=i; bestSold=sold; bestTs=ts; }
     }
-    for (const unitIdxs of Object.values(byUnit)){
-      let best=unitIdxs[0], bestSold=isDelivered(rows[best],H), bestTs=Date.parse(rows[best][H.LEAD_ORIG]||'')||0;
-      for (let j=1; j<unitIdxs.length; j++){
-        const i=unitIdxs[j], sold=isDelivered(rows[i],H), ts=Date.parse(rows[i][H.LEAD_ORIG]||'')||0;
-        if ((sold&&!bestSold)||(sold===bestSold&&ts>bestTs)){ best=i; bestSold=sold; bestTs=ts; }
+    winners.push(rows[best]);
+
+    if (idxs.length>1){
+      const bestUnit = isDelivered(rows[best],H) ? unitKeyOf(best) : '';
+      const seen = new Set(bestUnit ? [bestUnit] : []);
+      for (const i of idxs){
+        if (i===best) continue;
+        if (!isDelivered(rows[i],H)) continue;
+        const unit = unitKeyOf(i);
+        if (!unit || seen.has(unit)) continue; // blank or already-credited unit: not a distinct sale
+        seen.add(unit);
+        extraSales.push(rows[i]);
       }
-      winners.push(rows[best]);
     }
   }
-  return winners;
+  return { leads: winners, extraSales };
 }
 
 // ── Formatting helpers ────────────────────────────────────────────────
@@ -292,8 +309,10 @@ export function recompute(rows, H, storeId, fromStr, toStr){
     return true;
   });
 
-  // Step 2: global customer dedup
-  const dedup = dedupCustomers(filtered, H);
+  // Step 2: global customer dedup (1 lead per customer; extra distinct-unit
+  // sales are tracked separately and credited to delivered only — see
+  // dedupCustomers above)
+  const { leads: dedup, extraSales } = dedupCustomers(filtered, H);
 
   // Step 3: period classification
   // Parse as local-time datetimes (no 'Z'/offset suffix), not date-only
@@ -329,6 +348,19 @@ export function recompute(rows, H, storeId, fromStr, toStr){
   keep.forEach(c => {
     const rep = (c.row[H.SALES_REP]||'').trim();
     (byRep[rep] = byRep[rep]||[]).push(c);
+  });
+
+  // Extra distinct-unit sales for an already-counted customer: credited to
+  // delivered only (inLeadPeriod:false keeps them out of valid_leads/total_leads).
+  extraSales.forEach(r => {
+    const modMs2  = Date.parse(r[H.LEAD_MOD] ||'');
+    const origMs2 = Date.parse(r[H.LEAD_ORIG]||'');
+    const saleDateMs2 = !isNaN(modMs2) ? modMs2 : origMs2;
+    const inSalePeriodExtra = noFilter ? true : (!isNaN(saleDateMs2) && inRange(saleDateMs2));
+    if (!inSalePeriodExtra) return;
+    const rep = (r[H.SALES_REP]||'').trim();
+    if (!rep) return;
+    (byRep[rep] = byRep[rep]||[]).push({ row:r, sold:true, inLeadPeriod:false, inSalePeriod:true });
   });
 
   // Step 5: per-rep lead stats
