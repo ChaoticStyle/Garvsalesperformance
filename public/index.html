@@ -1086,8 +1086,8 @@ function setFilterRows(storeId, parsed, fileName){
   // deliveries on re-score. The dedup is idempotent \u2014 running
   // recompute() later on already-deduped rows is a no-op for dedup
   // and yields identical numbers to the original CSV.
-  const deduped = dedupCustomers(parsed.rows, H);
-  const sanitized = deduped.map(r => sanitizeRow(r, H));
+  const { leads: dedupedLeads, extraSales: dedupedExtraSales } = dedupCustomers(parsed.rows, H);
+  const sanitized = [...dedupedLeads, ...dedupedExtraSales].map(r => sanitizeRow(r, H));
   // We persist a SHALLOW H that only contains the integer indexes
   // plus allHeaders, NOT the _piiCols Set (Sets don't survive JSON
   // serialization). Aliases are recomputed by clients on read.
@@ -2203,7 +2203,7 @@ function recompute(rows,H,storeId,fromStr,toStr){
      per cluster (Sold first, then earliest origination). This gives
      us one row per unique customer across the entire dataset.
   */
-  const dedup=dedupCustomers(filtered,H);
+  const { leads: dedup, extraSales } = dedupCustomers(filtered,H);
 
   /* --- Step 3: Period classification per canonical row ---
      For each unique customer, decide:
@@ -2257,6 +2257,19 @@ function recompute(rows,H,storeId,fromStr,toStr){
   keep.forEach(c=>{
     const rep=(c.row[H.SALES_REP]||'').trim();
     (byRep[rep]=byRep[rep]||[]).push(c);
+  });
+
+  // Extra distinct-unit sales for an already-counted customer: credited to
+  // delivered only (inLeadPeriod:false keeps them out of valid_leads/total_leads).
+  extraSales.forEach(r=>{
+    const modMs2=Date.parse(r[H.LEAD_MOD]||'');
+    const origMs2=Date.parse(r[H.LEAD_ORIG]||'');
+    const saleDateMs2=!isNaN(modMs2)?modMs2:origMs2;
+    const inSalePeriodExtra=noFilter?true:(!isNaN(saleDateMs2)&&inRange(saleDateMs2));
+    if(!inSalePeriodExtra) return;
+    const rep=(r[H.SALES_REP]||'').trim();
+    if(!rep) return;
+    (byRep[rep]=byRep[rep]||[]).push({row:r,sold:true,inLeadPeriod:false,inSalePeriod:true});
   });
 
   /* --- Step 5: Per-rep lead stats with split-date semantics --- */
@@ -2562,6 +2575,13 @@ function normPhone(p){
 function normEmail(e){const s=String(e||'').trim().toLowerCase();return s.includes('@')?s:''}
 function normCust(c){return String(c||'').trim().toLowerCase().replace(/\s+/g,' ')}
 
+// One lead per customer (matched by name/email/phone), regardless of
+// VIN/Stock Number. A customer with more than one Sold row for a
+// genuinely different unit (distinct VIN-or-Stock-Number) is credited
+// an extra delivery via extraSales, but that row never joins the lead
+// list -- it can't inflate valid_leads/total_leads. Net result for
+// "customer buys 2 different units same day": 1 lead, 2 solds.
+// Keep in sync with netlify/functions/lib/scoring.mjs.
 function dedupCustomers(rows,H){
   // Union-find over rows. Each row is a node; we merge if it shares a
   // non-empty identity key with any other row.
@@ -2588,31 +2608,36 @@ function dedupCustomers(rows,H){
     (groups[k]=groups[k]||[]).push(i);
   }
 
-  // For each customer group, sub-group by unit (VIN → Stock Number → fallback)
-  // so a customer who bought two different units gets a winner row for each,
-  // while true duplicate leads for the same unit still collapse to one.
-  // Within each unit sub-group: prefer delivered, then latest Lead Origination Date.
-  const winners=[];
+  const unitKeyOf=i=>{
+    const vin=(rows[i][H.VIN]||'').trim().toUpperCase();
+    const stock=(rows[i][H.STOCK_NUM]||'').trim().toUpperCase();
+    return vin||stock||'';
+  };
+
+  const winners=[],extraSales=[];
   for(const k in groups){
     const idxs=groups[k];
-    if(idxs.length===1){winners.push(rows[idxs[0]]);continue;}
-    const byUnit={};
-    for(const i of idxs){
-      const vin=(rows[i][H.VIN]||'').trim().toUpperCase();
-      const stock=(rows[i][H.STOCK_NUM]||'').trim().toUpperCase();
-      const unitKey=vin||stock||'__none__';
-      (byUnit[unitKey]=byUnit[unitKey]||[]).push(i);
+    let best=idxs[0],bestSold=isDelivered(rows[best],H),bestTs=Date.parse(rows[best][H.LEAD_ORIG]||'')||0;
+    for(let j=1;j<idxs.length;j++){
+      const i=idxs[j],sold=isDelivered(rows[i],H),ts=Date.parse(rows[i][H.LEAD_ORIG]||'')||0;
+      if((sold&&!bestSold)||(sold===bestSold&&ts>bestTs)){best=i;bestSold=sold;bestTs=ts;}
     }
-    for(const unitIdxs of Object.values(byUnit)){
-      let best=unitIdxs[0],bestSold=isDelivered(rows[best],H),bestTs=Date.parse(rows[best][H.LEAD_ORIG]||'')||0;
-      for(let j=1;j<unitIdxs.length;j++){
-        const i=unitIdxs[j],sold=isDelivered(rows[i],H),ts=Date.parse(rows[i][H.LEAD_ORIG]||'')||0;
-        if((sold&&!bestSold)||(sold===bestSold&&ts>bestTs)){best=i;bestSold=sold;bestTs=ts;}
+    winners.push(rows[best]);
+
+    if(idxs.length>1){
+      const bestUnit=isDelivered(rows[best],H)?unitKeyOf(best):'';
+      const seen=new Set(bestUnit?[bestUnit]:[]);
+      for(const i of idxs){
+        if(i===best) continue;
+        if(!isDelivered(rows[i],H)) continue;
+        const unit=unitKeyOf(i);
+        if(!unit||seen.has(unit)) continue;
+        seen.add(unit);
+        extraSales.push(rows[i]);
       }
-      winners.push(rows[best]);
     }
   }
-  return winners;
+  return { leads:winners, extraSales };
 }
 
 /* Note on BH-adjusted response time: VinSolutions' "Adjusted Response
