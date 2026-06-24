@@ -121,7 +121,8 @@ export default async (request) => {
     //    could no longer merge them, inflating leads AND deliveries. The
     //    client's setFilterRows() already dedups-then-strips; this mirrors
     //    it so ingest- and browser-fed stores produce identical numbers.
-    const cleanRows = sanitizeRows(dedupCustomers(parsed.rows, parsed.H), parsed.H);
+    const { leads: dedupLeads, extraSales: dedupExtraSales } = dedupCustomers(parsed.rows, parsed.H);
+    const cleanRows = sanitizeRows([...dedupLeads, ...dedupExtraSales], parsed.H);
     await blobStore.setJSON('rows_' + storeId, {
       rows:       cleanRows,
       H:          parsed.H,
