@@ -53,6 +53,7 @@ const BLACKLIST = new Set([
   'Tyler Zimmerman','Ed Savage','Joe Steffen','Joshua Brevick',
   'James Duos','Justin Mire','James Murphy','Tommy Sacran',
   'Jerry Jones','Chris Seehorn','Matthew Kramer','Mike Lindemood',
+  'Michael Lindemood',
   'Steve Smith','Bradley Smart','Matthew Justice','John Schuster',
 ].map(normName));
 
