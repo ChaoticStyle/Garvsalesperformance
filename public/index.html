@@ -145,6 +145,13 @@ body{background:var(--ink0);color:var(--t0);font-family:var(--font);font-size:13
 .btn-gold:hover{background:var(--gold2)}
 .btn-ai{background:var(--p-bg);border-color:rgba(139,92,246,.3);color:var(--pur)}
 .btn-ai:hover{background:rgba(139,92,246,.14);border-color:rgba(139,92,246,.5)}
+.btn-sm{padding:4px 10px;font-size:11px}
+.btn-danger{background:var(--r-bg);border-color:rgba(239,68,68,.3);color:var(--red)}
+.btn-danger:hover{background:rgba(239,68,68,.18)}
+.btn-purple{background:rgba(139,92,246,.15);border-color:rgba(139,92,246,.35);color:#a78bfa}
+.btn-purple:hover{background:rgba(139,92,246,.28)}
+.btn-gold-outline{background:rgba(245,166,35,.12);border-color:rgba(245,166,35,.4);color:var(--gold)}
+.btn-gold-outline:hover{background:rgba(245,166,35,.22)}
 
 /* ══ PAGE SHELL ════════════════════════════════════════════════ */
 #page{display:flex;flex-direction:column;min-height:calc(100vh - 93px)}
@@ -720,7 +727,7 @@ body.booting .store-rail .s-tab:not(.net){
       <div id="sync-badge"><span class="sb-dot"></span>Syncing</div>
     </div>
     <div class="tb-actions">
-      <button class="btn btn-ghost" onclick="openHistory()">&#128197; History</button>
+      <button class="btn btn-ghost btn-sm" onclick="openAdmin()">&#9881; Admin</button>
       <button class="btn btn-ai" onclick="openAIModal()">&#10022; AI Coach</button>
       <button class="btn btn-gold" onclick="openUpload()">&#8679; Upload Data</button>
       <input type="file" id="file-input-hidden" accept=".csv" multiple style="display:none" onchange="handleFiles(this.files)">
@@ -758,31 +765,51 @@ body.booting .store-rail .s-tab:not(.net){
   </div>
 </div>
 
-<!-- ══ HISTORY MODAL ═══════════════════════════════════════════ -->
-<div class="ov" id="ov-history" onclick="if(event.target===this)closeOv('ov-history')">
-  <div class="modal lg" style="max-width:720px">
-    <button class="mcl" onclick="closeOv('ov-history')">&#10005;</button>
-    <h2>Upload History</h2>
-    <p>All uploads per store. Trend arrows appear on baseball cards once two uploads exist. Clear any individual upload or an entire store's history &mdash; current store data is preserved separately.</p>
-    <div id="hist-content" style="max-height:420px;overflow-y:auto;margin-bottom:14px"></div>
-    <!-- v4.3.9 — Two-tier action row.
-         Top row: non-destructive local actions (refresh from server,
-                  clear browser cache). Safe to click any time.
-         Bottom row: destructive actions (clear history, wipe server). -->
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:9px;padding-bottom:9px;border-bottom:1px solid var(--rule)">
-      <span style="font-size:10px;color:var(--t3);letter-spacing:1.2px;text-transform:uppercase">This Browser</span>
-      <button class="local-action local-refresh" onclick="refreshFromServer()" title="Re-fetch every store's scores from the Netlify server. No data is changed. Useful if you want to confirm you're seeing the latest data.">&#8634; Refresh from Server</button>
-      <button class="local-action local-clear" onclick="clearLocalCacheOnly()" title="Wipe this browser's localStorage and reload. Server data is untouched and will re-hydrate on reload. Use this for support / debugging or after a code change.">&#9888; Clear Local Cache (This Browser)</button>
+<!-- ══ ADMIN MODAL ══════════════════════════════════════════════ -->
+<div class="ov" id="ov-admin" onclick="if(event.target===this)closeOv('ov-admin')">
+  <div class="modal md">
+    <button class="mcl" onclick="closeOv('ov-admin')">&#10005;</button>
+    <h2>&#9881; Admin Actions</h2>
+
+    <div id="admin-lock" style="display:none">
+      <p>Admin actions are password protected. Enter the password to continue.</p>
+      <form id="admin-lock-form" style="display:flex;gap:8px">
+        <input type="password" id="admin-lock-input" placeholder="Password" autocomplete="off">
+        <button type="submit" class="btn btn-gold btn-sm">Unlock</button>
+      </form>
+      <div id="admin-lock-error" style="color:var(--red);font-size:11px;margin-top:6px"></div>
     </div>
-    <div class="mfoot" style="justify-content:space-between;align-items:center">
-      <div style="display:flex;gap:7px;flex-wrap:wrap">
-        <button class="hist-clear-all" onclick="clearAllHistory()">&#128465; Clear All History</button>
-        <button class="hist-clear-all" onclick="clearAllBlobData()" style="background:var(--red);color:#fff">&#128465; Clear All Server Data</button>
+
+    <div id="admin-real-content">
+      <div style="margin-bottom:14px">
+        <div style="font-size:9px;color:var(--t3);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:6px">Upload History</div>
+        <p style="margin-bottom:8px">All uploads per store. Trend arrows appear on baseball cards once two uploads exist.</p>
+        <div id="hist-content" style="max-height:360px;overflow-y:auto"></div>
       </div>
-      <div style="display:flex;gap:7px">
-        <button class="btn btn-ghost" onclick="closeOv('ov-history')">Close</button>
-        <button class="btn btn-gold" onclick="closeOv('ov-history');openUpload()">&#8679; Upload New Week</button>
+      <div style="height:1px;background:var(--rule2);margin:16px 0"></div>
+      <div>
+        <div style="font-size:9px;color:var(--t3);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:6px">This Browser</div>
+        <p style="margin-bottom:10px;color:var(--t2)">Refresh this browser's view from the server, or wipe the local cache and reload. Server data is never touched by either.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-purple btn-sm" onclick="refreshFromServer()" title="Re-fetch every store's scores from the Netlify server. No data is changed.">&#8634; Refresh from Server</button>
+          <button class="btn btn-gold-outline btn-sm" onclick="clearLocalCacheOnly()" title="Wipe this browser's localStorage and reload. Server data is untouched.">&#9888; Clear Local Cache</button>
+        </div>
       </div>
+      <div style="height:1px;background:var(--rule2);margin:16px 0"></div>
+      <div>
+        <div style="font-size:9px;color:var(--red);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:6px">Danger Zone</div>
+        <p style="margin-bottom:10px;color:var(--t2)">Permanently clear history or server data. Cannot be undone.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-danger btn-sm" onclick="clearAllHistory()">&#128465; Clear All History</button>
+          <button class="btn btn-danger btn-sm" onclick="clearAllBlobData()">&#128465; Clear All Server Data</button>
+        </div>
+        <div id="admin-danger-extra" style="margin-top:10px"></div>
+      </div>
+    </div>
+
+    <div class="mfoot" style="margin-top:18px">
+      <button class="btn btn-ghost" onclick="closeOv('ov-admin')">Close</button>
+      <button class="btn btn-gold" onclick="closeOv('ov-admin');openUpload()">&#8679; Upload New Week</button>
     </div>
   </div>
 </div>
@@ -1375,7 +1402,7 @@ function buildPage(){
         '<span class="tag tag-c">'+d.reps.length+' reps scored</span>'+
       '</div>'+
       '<div class="ctx-r">'+
-        '<button class="btn btn-ghost" onclick="openHistory()">&#128197; History</button>'+
+        '<button class="btn btn-ghost btn-sm" onclick="openAdmin()">&#9881; Admin</button>'+
         '<button class="btn btn-gold" onclick="openUploadFor(\''+s.id+'\')">&#8679; Update Data</button>'+
       '</div>'+
     '</div>'+
@@ -1670,7 +1697,7 @@ function netHTML(){
     (brandRow&&getStoreData(brandRow.id)?'<span class="tag tag-brand">Airstream brand tab live</span>':'')+
     unfilterableNote+
     '</div><div class="ctx-r">'+
-    '<button class="btn btn-ghost" onclick="openHistory()">&#128197; History</button>'+
+    '<button class="btn btn-ghost btn-sm" onclick="openAdmin()">&#9881; Admin</button>'+
     '<button class="btn btn-gold" onclick="openUpload()">&#8679; Upload Store Data</button>'+
     '</div></div>'+
     '<div id="dr-panel" class="dr-panel'+(filterActive?' dr-open':'')+'">'+
@@ -1947,7 +1974,7 @@ function methodHTML(){
     '<div class="mc"><div class="mc-h"><div class="mpct" style="color:var(--t3)">0%</div><div class="mn">Not Scored</div></div><ul class="md"><li>Revenue and Front-End Gross are not displayed or scored</li><li>VinSolutions gross is pre-adjustment; IDS is authoritative for margin</li></ul></div>'+
   '</div>'+
   '<div class="panel" style="margin-bottom:9px"><div class="panel-t">Composite Score Mechanics</div><ul class="md" style="font-size:12px;color:var(--t1)"><li>The composite is a 100-point scale: Conversion (0–30) + Volume (0–20) + Speed (0–15) + Contact (0–15) + Floor (0–20)</li><li>Conversion, Volume, Contact, and Floor are each a continuous rate (0–100%) multiplied by their weight — every incremental change in performance moves the score (e.g. 28%→29% conversion = +0.3 pts)</li><li>Speed is different: it is a fixed bucket value (15 / 12 / 8 / 4 / 10 pts) assigned by which response-time threshold the rep falls under, not a rate. The 15% badge is an accurate ceiling, but two reps can land on the exact same Speed score despite very different real response times if they fall in the same bucket (e.g. 16 min and 59 min both score 12 pts as “Strong”)</li></ul></div>'+
-  '<div class="panel" style="margin-bottom:9px"><div class="panel-t">Rep Exclusions \u2014 Every Upload, Every Store</div><ul class="md" style="font-size:12px;color:var(--t1)"><li>Managers and non-sales staff: 21-name blacklist (Tony Vitrano, Christian Borrouso, Shane Roberts, Pete Smith, Tyler Zimmerman, Ed Savage, Joe Steffen, Joshua Brevick, James Duos, Justin Mire, James Murphy, Tommy Sacran, Jerry Jones, Chris Seehorn, Matthew Kramer, Mike Lindemood, Michael Lindemood, Steve Smith, Bradley Smart, Matthew Justice, John Schuster) plus Assigned-User user group = Manager / Reception / Admin. Note: \"John Schuster Jr\" is a salesperson and is NOT blacklisted.</li><li>v4.2: Per-store whitelists removed. Anyone appearing in the Sales Rep column who is not on the manager blacklist is now scored automatically \u2014 new hires no longer need a code update.</li><li>System accounts: "Your Friends at Great American RV" and YOD House Agent entries removed</li><li>Bad leads (excluded from the conversion denominator): Bad Credit, Bad or no contact information, Dealer test lead, Duplicate lead, No intent to buy, Out of market, Purchased different brand different dealer, Purchased from private party, Requested no further contact</li><li>700 Credit: Lead Source = "700credithmd" or Lead Source Group = "700 Credit"</li><li>Airstream: identified by Lead Source, Lead Source Group, OR Make (rules configurable in the AIRSTREAM_RULES block at the top of the script). Source-based matching catches leads with no vehicle attached.</li><li>Only Sales Rep is graded \u2014 if the row was worked by a manager it does not count</li><li>Minimum 10 valid leads required to be scored on rooftop tabs. The Airstream brand tab drops this floor to 1 because most reps see Airstream leads only occasionally and the 10-lead minimum would hide ~80% of the brand pipeline.</li><li>v4 note: Completed-By and Created-By user groups are not consulted \u2014 those columns describe normal manager-at-desk workflow, not who ran the visit</li></ul></div>'+
+  '<div class="panel" style="margin-bottom:9px"><div class="panel-t">Rep Exclusions \u2014 Every Upload, Every Store</div><ul class="md" style="font-size:12px;color:var(--t1)"><li>Managers and non-sales staff: 20-name blacklist (Tony Vitrano, Christian Borrouso, Shane Roberts, Pete Smith, Tyler Zimmerman, Ed Savage, Joe Steffen, Joshua Brevick, James Duos, Justin Mire, James Murphy, Tommy Sacran, Jerry Jones, Chris Seehorn, Matthew Kramer, Mike Lindemood, Steve Smith, Bradley Smart, Matthew Justice, John Schuster) plus Assigned-User user group = Manager / Reception / Admin. Note: \"John Schuster Jr\" is a salesperson and is NOT blacklisted.</li><li>v4.2: Per-store whitelists removed. Anyone appearing in the Sales Rep column who is not on the manager blacklist is now scored automatically \u2014 new hires no longer need a code update.</li><li>System accounts: "Your Friends at Great American RV" and YOD House Agent entries removed</li><li>Bad leads (excluded from the conversion denominator): Bad Credit, Bad or no contact information, Dealer test lead, Duplicate lead, No intent to buy, Out of market, Purchased different brand different dealer, Purchased from private party, Requested no further contact</li><li>700 Credit: Lead Source = "700credithmd" or Lead Source Group = "700 Credit"</li><li>Airstream: identified by Lead Source, Lead Source Group, OR Make (rules configurable in the AIRSTREAM_RULES block at the top of the script). Source-based matching catches leads with no vehicle attached.</li><li>Only Sales Rep is graded \u2014 if the row was worked by a manager it does not count</li><li>Minimum 10 valid leads required to be scored on rooftop tabs. The Airstream brand tab drops this floor to 1 because most reps see Airstream leads only occasionally and the 10-lead minimum would hide ~80% of the brand pipeline.</li><li>v4 note: Completed-By and Created-By user groups are not consulted \u2014 those columns describe normal manager-at-desk workflow, not who ran the visit</li></ul></div>'+
   '<div class="panel" style="margin-bottom:9px"><div class="panel-t">Lineup Positions</div>'+
   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'+
     '<div><div style="font-family:var(--disp);font-size:13px;color:var(--gold);margin-bottom:3px">Starters (1\u20134)</div><div style="font-size:11px;color:var(--t1)">Top producers. Leading in conversion and volume. The benchmark for the floor.</div></div>'+
@@ -2109,7 +2136,6 @@ const BLACKLIST=new Set([
   'Tyler Zimmerman','Ed Savage','Joe Steffen','Joshua Brevick',
   'James Duos','Justin Mire','James Murphy','Tommy Sacran',
   'Jerry Jones','Chris Seehorn','Matthew Kramer','Mike Lindemood',
-  'Michael Lindemood',
   'Steve Smith','Bradley Smart','Matthew Justice',
   // NOTE: 'John Schuster' is the manager. 'John Schuster Jr' is a salesperson
   // and normalizes to a different string, so only the manager is blocked here.
@@ -2943,7 +2969,47 @@ function runAIModal(){const q=document.getElementById('ai-modal-inp')?.value?.tr
 function openAIModal(){document.getElementById('ai-modal-inp').value='';document.getElementById('ai-modal-think').style.display='none';document.getElementById('ai-modal-res').style.display='none';openOv('ov-ai')}
 
 /* ══ HISTORY ═════════════════════════════════════════════════ */
-function openHistory(){renderHistoryContent();openOv('ov-history')}
+function openAdmin(){
+  if(sessionStorage.getItem('adminUnlocked')==='1')showAdminContent();
+  else showAdminLock();
+  openOv('ov-admin');
+}
+function showAdminLock(){
+  document.getElementById('admin-lock').style.display='flex';
+  document.getElementById('admin-real-content').style.display='none';
+}
+function showAdminContent(){
+  document.getElementById('admin-lock').style.display='none';
+  document.getElementById('admin-real-content').style.display='block';
+  renderHistoryContent();
+}
+function adminPassword(){return sessionStorage.getItem('adminPassword')||'';}
+function lockAdmin(reason){
+  sessionStorage.removeItem('adminUnlocked');
+  sessionStorage.removeItem('adminPassword');
+  if(reason)toast(reason,'red');
+  showAdminLock();
+}
+document.getElementById('admin-lock-form').addEventListener('submit',async(e)=>{
+  e.preventDefault();
+  const val=document.getElementById('admin-lock-input').value;
+  if(!val)return;
+  const errEl=document.getElementById('admin-lock-error');
+  errEl.textContent='';
+  try{
+    const res=await fetch('/api/admin-auth?password='+encodeURIComponent(val));
+    const data=await res.json();
+    if(data.ok){
+      sessionStorage.setItem('adminPassword',val);
+      sessionStorage.setItem('adminUnlocked','1');
+      showAdminContent();
+    }else{
+      errEl.textContent='Incorrect password.';
+    }
+  }catch(err){
+    errEl.textContent='Could not verify password — try again.';
+  }
+});
 function renderHistoryContent(){
   const container=document.getElementById('hist-content');
   if(!container)return;
@@ -2991,7 +3057,9 @@ function renderHistoryRows(){
     STORES.filter(s=>getHist(s.id).length>0).map(s=>
       '<button class="btn-clear-store" onclick="clearStoreHistory(\''+s.id+'\')">'+s.name+' ('+getHist(s.id).length+')</button>'
     ).join('');
-  document.getElementById('hist-content').appendChild(storeSection);
+  const dangerExtra=document.getElementById('admin-danger-extra');
+  if(dangerExtra)dangerExtra.innerHTML='';
+  dangerExtra?.appendChild(storeSection);
   const resetSection=document.createElement('div');
   resetSection.style.cssText='margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center';
   resetSection.innerHTML='<span style="font-size:10px;color:var(--t3);letter-spacing:.8px;text-transform:uppercase">Reset store (all data):</span>'+
@@ -2999,7 +3067,7 @@ function renderHistoryRows(){
       const hasData=getHist(s.id).length>0||lsGet('d_'+s.id);
       return '<button class="btn-clear-store" style="'+(hasData?'border-color:var(--red);color:var(--red)':'')+'" onclick="clearStoreData(\''+s.id+'\')">'+s.name+'</button>';
     }).join('');
-  document.getElementById('hist-content').appendChild(resetSection);
+  dangerExtra?.appendChild(resetSection);
 }
 function deleteHistRow(storeId,idx){
   const h=getHist(storeId);
@@ -3018,7 +3086,10 @@ async function clearStoreData(storeId){
   const s=STORES.find(x=>x.id===storeId);
   if(!confirm('⚠️ Reset '+s.name+' to fresh state?\n\nThis will delete ALL scores, history, and raw files for this store from the server and this browser.\n\nThis cannot be undone.'))return;
   try{
-    if(BACKEND_URL) await fetch(BACKEND_URL+'/api/store/'+storeId,{method:'DELETE'}).catch(()=>{});
+    if(BACKEND_URL){
+      const res=await fetch(BACKEND_URL+'/api/store/'+storeId+'?password='+encodeURIComponent(adminPassword()),{method:'DELETE'});
+      if(res.status===401){lockAdmin('Session expired — re-enter admin password.');return;}
+    }
     lsSet('d_'+storeId,null);lsSet('h_'+storeId,[]);lsSet('hist_cleared_'+storeId,true);
     clearFilterRows(storeId);  // v4.3.4
     renderHistoryContent();buildRail();
@@ -3034,7 +3105,10 @@ function clearAllHistory(){
 async function clearAllBlobData(){
   if(!confirm('⚠️ This will permanently delete ALL server history data for all stores from Netlify Blobs.\n\nScore data will also be cleared from this browser.\n\nThis cannot be undone. Are you sure?'))return;
   try{
-    if(BACKEND_URL) await Promise.all(STORES.map(s=>fetch(BACKEND_URL+'/api/store/'+s.id,{method:'DELETE'}).catch(()=>{})));
+    if(BACKEND_URL){
+      const results=await Promise.all(STORES.map(s=>fetch(BACKEND_URL+'/api/store/'+s.id+'?password='+encodeURIComponent(adminPassword()),{method:'DELETE'})));
+      if(results.some(r=>r.status===401)){lockAdmin('Session expired — re-enter admin password.');return;}
+    }
     STORES.forEach(s=>{lsSet('h_'+s.id,[]);lsSet('hist_cleared_'+s.id,true);lsSet('d_'+s.id,null);clearFilterRows(s.id);});
     renderHistoryContent();buildRail();goStore('network');
     toast('All server and local data cleared.','gold');
@@ -3059,7 +3133,7 @@ async function refreshFromServer(){
     toast('No backend configured — nothing to refresh from.','gold');
     return;
   }
-  closeOv('ov-history');
+  closeOv('ov-admin');
   showSyncBadge(true);
   // Re-fetch every store's data + history + row cache in parallel and
   // re-apply through the same comparators used at boot. We don't
