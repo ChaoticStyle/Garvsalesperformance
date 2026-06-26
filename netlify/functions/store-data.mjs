@@ -58,6 +58,11 @@ export default async (request) => {
   }
 
   if (request.method === 'DELETE') {
+    const expectedPassword = process.env.DASHBOARD_PASSWORD;
+    const suppliedPassword = url.searchParams.get('password');
+    if (expectedPassword && suppliedPassword !== expectedPassword) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401, headers: CORS });
+    }
     try {
       // v4.3.3: clear the separate raw-CSV blob.
       // v4.4.0: also clear the row cache blob.
